@@ -5,6 +5,8 @@ import { ALL_NAV_ITEMS, getDefaultPath } from "@/lib/nav";
 import CategoryManagementPage from "@/pages/CategoryManagementPage";
 import DashboardPage from "@/pages/DashboardPage";
 import DeadlinesPage from "@/pages/DeadlinesPage";
+import EpicDetailPage from "@/pages/EpicDetailPage";
+import EpicManagementPage from "@/pages/EpicManagementPage";
 import HolidayManagementPage from "@/pages/HolidayManagementPage";
 import KanbanPage from "@/pages/KanbanPage";
 import LoginPage from "@/pages/LoginPage";
@@ -34,6 +36,7 @@ const PAGE_COMPONENTS = {
   "/timeline": TimelinePage,
   "/projects": ProjectsPage,
   "/projects/manage": ProjectManagementPage,
+  "/epics/manage": EpicManagementPage,
   "/users": UserManagementPage,
   "/roles": RolePermissionPage,
   "/categories": CategoryManagementPage,
@@ -82,6 +85,7 @@ export default function App() {
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:id/notes" element={<ProjectNotesListPage />} />
         <Route path="/projects/:id/notes/:noteId" element={<ProjectNoteDetailPage />} />
+        <Route path="/projects/:id/epics/:epicId" element={<EpicDetailPage />} />
         {/* Dibuka dari widget "Deadline Mendekat" di Dashboard. */}
         <Route path="/deadlines" element={<DeadlinesPage />} />
         {/* Dibuka dari widget "Perlu Direview" di Dashboard. */}

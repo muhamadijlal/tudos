@@ -1,4 +1,3 @@
-import { CodeBadge } from "@/components/CodeBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { FormRequiredNote, RequiredMark } from "@/components/RequiredMark";
@@ -147,10 +146,7 @@ export default function ProjectNotesListPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              {project?.code && <CodeBadge>{project.code}</CodeBadge>}
-              {project?.name ?? "Catatan Project"}
-            </CardTitle>
+            <CardTitle>{project?.name ?? "Catatan Project"}</CardTitle>
             <CardDescription>
               {isOwner
                 ? "Catatan bebas buat project ini — bisa dipakai buat apa aja, gak cuma daftar task."

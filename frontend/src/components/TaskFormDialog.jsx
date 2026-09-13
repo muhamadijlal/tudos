@@ -38,6 +38,7 @@ function todayStr() {
 function emptyForm() {
   return {
     projectId: "",
+    epicId: "",
     userIds: [],
     categoryId: "",
     name: "",
@@ -57,6 +58,7 @@ export function TaskFormDialog({
   onOpenChange,
   task,
   projects,
+  epics,
   users,
   categories,
   canAssignOthers,
@@ -91,6 +93,7 @@ export function TaskFormDialog({
     if (task) {
       setForm({
         projectId: String(task.project?.id ?? ""),
+        epicId: String(task.epic?.id ?? ""),
         userIds: (task.assignees ?? []).map((a) => String(a.id)),
         categoryId: String(task.category?.id ?? ""),
         name: task.name,
@@ -115,6 +118,10 @@ export function TaskFormDialog({
 
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const selectedProject = projects.find((p) => String(p.id) === form.projectId);
+  const epicOptions = (epics ?? [])
+    .filter((e) => String(e.projectId) === form.projectId)
+    .map((e) => ({ value: String(e.id), label: e.name }));
+  const selectedEpic = (epics ?? []).find((e) => String(e.id) === form.epicId);
   const userOptions = users.map((u) => ({ value: String(u.id), label: u.name }));
   const categoryOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
 
@@ -132,6 +139,7 @@ export function TaskFormDialog({
   function validate() {
     return collectErrors({
       projectId: validateRequired(form.projectId, "Project"),
+      epicId: validateRequired(form.epicId, "Epic"),
       userIds: form.userIds.length === 0 ? "Assignee wajib diisi" : null,
       categoryId: validateRequired(form.categoryId, "Kategori"),
       name: validateRequired(form.name, "Nama task"),
@@ -164,7 +172,7 @@ export function TaskFormDialog({
 
   async function performSubmit() {
     const payload = new FormData();
-    payload.append("projectId", form.projectId);
+    payload.append("epicId", form.epicId);
     for (const userId of form.userIds) payload.append("userIds", userId);
     payload.append("categoryId", form.categoryId);
     payload.append("name", form.name);
@@ -238,7 +246,7 @@ export function TaskFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5">
               <Label>
                 Project
@@ -247,7 +255,9 @@ export function TaskFormDialog({
               <Combobox
                 options={projectOptions}
                 value={form.projectId}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, projectId: value }))}
+                onValueChange={(value) =>
+                  setForm((prev) => ({ ...prev, projectId: value, epicId: "" }))
+                }
                 placeholder="Pilih project"
                 searchPlaceholder="Cari project..."
                 emptyText="Project tidak ditemukan."
@@ -256,9 +266,29 @@ export function TaskFormDialog({
               {fieldErrors.projectId && (
                 <p className="text-xs text-destructive">{fieldErrors.projectId}</p>
               )}
-              {!task && selectedProject && (
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>
+                Epic
+                <RequiredMark />
+              </Label>
+              <Combobox
+                options={epicOptions}
+                value={form.epicId}
+                onValueChange={(value) => setForm((prev) => ({ ...prev, epicId: value }))}
+                placeholder={form.projectId ? "Pilih epic" : "Pilih project dulu"}
+                searchPlaceholder="Cari epic..."
+                emptyText="Epic tidak ditemukan."
+                disabled={!form.projectId}
+                ariaInvalid={Boolean(fieldErrors.epicId)}
+              />
+              {fieldErrors.epicId && (
+                <p className="text-xs text-destructive">{fieldErrors.epicId}</p>
+              )}
+              {!task && selectedEpic && (
                 <p className="flex items-center gap-1.5 text-muted-foreground">
-                  Preview kode: <CodeBadge>{selectedProject.nextTaskCode}</CodeBadge>
+                  Preview kode: <CodeBadge>{selectedEpic.nextTaskCode}</CodeBadge>
                 </p>
               )}
             </div>

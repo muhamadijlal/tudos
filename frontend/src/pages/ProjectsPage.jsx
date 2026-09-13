@@ -1,5 +1,4 @@
 import { AssigneeAvatar } from "@/components/AssigneeAvatar";
-import { CodeBadge } from "@/components/CodeBadge";
 import { TablePagination } from "@/components/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,9 +32,7 @@ export default function ProjectsPage() {
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return projects.filter((p) => {
-      if (query && !p.name.toLowerCase().includes(query) && !p.code?.toLowerCase().includes(query)) {
-        return false;
-      }
+      if (query && !p.name.toLowerCase().includes(query)) return false;
       if (ownershipFilter === "mine" && p.user?.id !== currentUser?.id) return false;
       if (
         ownershipFilter === "assigned" &&
@@ -93,7 +90,7 @@ export default function ProjectsPage() {
             <MagnifyingGlass />
           </InputGroupAddon>
           <InputGroupInput
-            placeholder="Cari project (nama/kode)..."
+            placeholder="Cari project (nama)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -131,10 +128,7 @@ export default function ProjectsPage() {
                 className="cursor-pointer transition-colors hover:bg-muted/50"
               >
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CodeBadge>{project.code}</CodeBadge>
-                    {project.name}
-                  </CardTitle>
+                  <CardTitle>{project.name}</CardTitle>
                   <CardDescription className="line-clamp-2">
                     {project.description || "Tanpa deskripsi"}
                   </CardDescription>

@@ -31,7 +31,7 @@ export function findAll({ assigneeId } = {}) {
       ...(assigneeId ? { assignees: { some: { userId: assigneeId } } } : {}),
     },
     include: {
-      project: { include: { user: true } },
+      epic: { include: { project: { include: { user: true } } } },
       assignees: { include: { user: true } },
       category: true,
       attachments: true,
@@ -47,7 +47,7 @@ export async function findById(taskId, { assigneeId } = {}) {
       ...(assigneeId ? { assignees: { some: { userId: assigneeId } } } : {}),
     },
     include: {
-      project: { include: { user: true } },
+      epic: { include: { project: { include: { user: true } } } },
       assignees: { include: { user: true } },
       category: true,
       attachments: true,
@@ -70,10 +70,10 @@ export function findPendingReview(ownerId) {
     where: {
       deletedAt: null,
       status: "in_review",
-      project: { userId: ownerId, deletedAt: null },
+      epic: { deletedAt: null, project: { userId: ownerId, deletedAt: null } },
     },
     include: {
-      project: { include: { user: true } },
+      epic: { include: { project: { include: { user: true } } } },
       assignees: { include: { user: true } },
       category: true,
       attachments: true,
@@ -192,32 +192,33 @@ export function listStatusHistory(taskId) {
 export async function create(data, files = [], requester) {
   const { userIds, ...rest } = data;
 
-  const [project, category] = await Promise.all([
-    prisma.project.findFirst({
-      where: { id: data.projectId, deletedAt: null },
+  const [epic, category] = await Promise.all([
+    prisma.epic.findFirst({
+      where: { id: data.epicId, deletedAt: null },
+      include: { project: true },
     }),
     prisma.category.findFirst({
       where: { id: data.categoryId, deletedAt: null },
     }),
   ]);
 
-  if (!project) throw new ApiError(404, "project not found");
+  if (!epic) throw new ApiError(404, "epic not found");
   if (!category) throw new ApiError(404, "category not found");
   await assertUsersExist(userIds);
-  assertCanAssign(requester, userIds, project.userId);
+  assertCanAssign(requester, userIds, epic.project.userId);
 
-  // Nomor urut task ala Jira (project.code + sequence, mis. "WEB-12") — counter
-  // di project di-increment atomik biar gak ada nomor bentrok kalau dua task
+  // Nomor urut task ala Jira (epic.code + sequence, mis. "WEB-12") — counter
+  // di epic di-increment atomik biar gak ada nomor bentrok kalau dua task
   // dibuat bareng, dan nomornya gak pernah dipakai ulang meski task-nya dihapus.
-  const updatedProject = await prisma.project.update({
-    where: { id: data.projectId },
+  const updatedEpic = await prisma.epic.update({
+    where: { id: data.epicId },
     data: { taskCounter: { increment: 1 } },
   });
 
   return prisma.task.create({
     data: {
       ...rest,
-      sequence: updatedProject.taskCounter,
+      sequence: updatedEpic.taskCounter,
       assignees: { create: userIds.map((userId) => ({ userId })) },
       attachments: files.length ? { create: attachmentRows(files) } : undefined,
     },
@@ -232,10 +233,11 @@ export async function update(taskId, data, files = [], requester) {
   });
   if (!task) throw new ApiError(404, "task not found");
 
-  const [project, category] = await Promise.all([
-    data.projectId
-      ? prisma.project.findFirst({
-          where: { id: data.projectId, deletedAt: null },
+  const [epic, category] = await Promise.all([
+    data.epicId
+      ? prisma.epic.findFirst({
+          where: { id: data.epicId, deletedAt: null },
+          include: { project: true },
         })
       : Promise.resolve(null),
     data.categoryId
@@ -245,27 +247,30 @@ export async function update(taskId, data, files = [], requester) {
       : Promise.resolve(null),
   ]);
 
-  if (data.projectId && !project) throw new ApiError(404, "project not found");
+  if (data.epicId && !epic) throw new ApiError(404, "epic not found");
   if (data.categoryId && !category) throw new ApiError(404, "category not found");
   if (data.userIds) await assertUsersExist(data.userIds);
 
-  // `project` udah ke-fetch di atas kalau caller ngirim projectId (form edit
+  // `epic` udah ke-fetch di atas kalau caller ngirim epicId (form edit
   // selalu ngirim ini) — cuma perlu fetch ekstra buat kasus Kanban
   // drag-and-drop yang cuma ngirim `{ status }` doang, atau assign-only.
   const statusChanging = data.status && data.status !== task.status;
-  let owningProject = project;
-  if (!owningProject && (data.userIds || statusChanging)) {
-    owningProject = await prisma.project.findFirst({ where: { id: task.projectId } });
+  let owningEpic = epic;
+  if (!owningEpic && (data.userIds || statusChanging)) {
+    owningEpic = await prisma.epic.findFirst({
+      where: { id: task.epicId },
+      include: { project: true },
+    });
   }
 
   if (data.userIds) {
-    assertCanAssign(requester, data.userIds, owningProject.userId);
+    assertCanAssign(requester, data.userIds, owningEpic.project.userId);
   }
 
   if (statusChanging) {
     assertCanSetStatus(
       data.status,
-      owningProject.userId,
+      owningEpic.project.userId,
       task.assignees.map((a) => a.userId),
       requester,
     );
@@ -275,14 +280,14 @@ export async function update(taskId, data, files = [], requester) {
     }
   }
 
-  // Task pindah project (kode-nya = project.code + sequence) → nomor urut
-  // lama gak relevan lagi di project baru, jadi diambil nomor baru dari
-  // project tujuan (sama kayak Jira: issue yang dipindah dapet key baru).
-  const movingProject = data.projectId && data.projectId !== task.projectId;
-  const sequence = movingProject
+  // Task pindah epic (kode-nya = epic.code + sequence) → nomor urut lama
+  // gak relevan lagi di epic baru, jadi diambil nomor baru dari epic tujuan
+  // (sama kayak Jira: issue yang dipindah project/epic dapet key baru).
+  const movingEpic = data.epicId && data.epicId !== task.epicId;
+  const sequence = movingEpic
     ? (
-        await prisma.project.update({
-          where: { id: data.projectId },
+        await prisma.epic.update({
+          where: { id: data.epicId },
           data: { taskCounter: { increment: 1 } },
         })
       ).taskCounter
@@ -299,7 +304,7 @@ export async function update(taskId, data, files = [], requester) {
       startDate: data.startDate,
       dueDate: data.dueDate,
       reportDate: data.reportDate,
-      projectId: data.projectId,
+      epicId: data.epicId,
       sequence,
       // Ganti seluruh set assignee lama dengan yang baru (bukan nambahin) —
       // cuma dieksekusi kalau userIds beneran dikirim (lihat data.userIds check di atas).
@@ -327,7 +332,7 @@ export async function update(taskId, data, files = [], requester) {
     if (task.status === "in_review") {
       await notifyAssigneesOfReviewOutcome({
         task,
-        code: `${owningProject.code}-${task.sequence}`,
+        code: `${owningEpic.code}-${task.sequence}`,
         toStatus: data.status,
         requester,
         note: data.reviewNote?.trim(),

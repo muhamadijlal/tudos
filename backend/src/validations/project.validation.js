@@ -8,8 +8,6 @@ const ProjectStoreValidation = z.object({
       .max(100, "Name max length is 100 character")
       .trim(),
     description: z.string().trim().optional(),
-    startDate: z.coerce.date().nullable().optional(),
-    dueDate: z.coerce.date().nullable().optional(),
   }),
 });
 
@@ -33,8 +31,6 @@ const ProjectUpdateValidation = z.object({
       .max(100, "Name max length is 100 character")
       .trim(),
     description: z.string().trim().optional(),
-    startDate: z.coerce.date().nullable().optional(),
-    dueDate: z.coerce.date().nullable().optional(),
   }),
 });
 

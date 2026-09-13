@@ -2,6 +2,22 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.1] - 2026-09-14
+
+### Changed (breaking)
+- Hierarki data berubah dari Project -> Task jadi **Project -> Epic -> Task**. Epic adalah entitas wajib baru: setiap task sekarang harus punya Epic (bukan nempel langsung ke Project lagi), dengan nama, deskripsi, due date, owner/lead opsional, dan progress bar otomatis (dihitung dari persentase task selesai).
+- Kode task berubah format dari `PROJECTCODE-N` jadi `EPICCODE-N` (mis. `BAC-1`) — kode & counter yang tadinya nempel di Project sekarang dipindah ke Epic. Project sendiri gak lagi punya kode.
+- Data lama otomatis dimigrasikan: tiap project existing dapet 1 Epic default bernama "General" yang mewarisi kode & counter project-nya, semua task lama dipindah ke situ — kode task lama gak berubah.
+- Project gak lagi punya field Tanggal Mulai/Due Date sendiri — Project sekarang murni container tanpa batas waktu, due date-nya sekarang di level Epic (tiap fitur/epic punya target selesai sendiri-sendiri).
+
+### Added
+- Section "Epics" di halaman detail Project — bikin/ubah/hapus Epic (cuma pemilik project), lihat progress tiap Epic.
+- Halaman detail Epic baru — daftar task terkait, link cepat ke Tudos yang udah difilter ke Epic itu.
+- Filter Epic baru di Kanban dan Tudos, cascading dari filter Project yang udah ada.
+- Timeline sekarang 3 level (Project -> Epic -> Task) — baris Project & Epic tetap tampil sebagai baris grup meski gak punya tanggal.
+- Epic sekarang punya warna sendiri (di-assign otomatis, bisa diganti manual) — tampil sebagai chip berwarna di kartu Kanban dan kolom Epic di Tudos, biar gampang bedain task dari epic mana secara visual sekilas (ala label Epic di Jira).
+- Halaman baru **Management Epic** — list flat semua epic lintas project (filter Project & kepemilikan, pencarian, export), buat/ubah/hapus epic dari satu tempat tanpa harus masuk ke tiap halaman detail project. Permission baru `menu.epicsManage` (otomatis kebuka buat role yang udah punya `menu.projectsManage`).
+
 ## [1.0.0] - 2026-09-14
 
 ### Added

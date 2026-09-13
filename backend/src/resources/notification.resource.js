@@ -9,11 +9,11 @@ const notificationResource = (notification) => ({
   task: notification.task
     ? {
         id: notification.task.id,
-        code: notification.task.project?.code
-          ? `${notification.task.project.code}-${notification.task.sequence}`
+        code: notification.task.epic?.code
+          ? `${notification.task.epic.code}-${notification.task.sequence}`
           : null,
         name: notification.task.name,
-        projectId: notification.task.projectId,
+        epicId: notification.task.epicId,
       }
     : null,
   createdAt: notification.createdAt,

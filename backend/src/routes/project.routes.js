@@ -1,6 +1,11 @@
+import epicController from "#controllers/epic.controller.js";
 import projectController from "#controllers/project.controller.js";
 import projectNoteController from "#controllers/project-note.controller.js";
 import validate from "#middleware/validate.middleware.js";
+import {
+  EpicListValidation,
+  EpicStoreValidation,
+} from "#validations/epic.validation.js";
 import {
   ProjectDeleteValidation,
   ProjectFindByIdValidation,
@@ -48,6 +53,19 @@ router.post(
   "/:id/notes",
   validate(ProjectNoteStoreValidation),
   projectNoteController.createNote,
+);
+
+// 1 project bisa punya banyak epic — operasi per-epic (get/update/delete by
+// id) ada di #routes/epic.routes.js (/epics).
+router.get(
+  "/:id/epics",
+  validate(EpicListValidation),
+  epicController.getEpicsByProject,
+);
+router.post(
+  "/:id/epics",
+  validate(EpicStoreValidation),
+  epicController.createEpic,
 );
 
 export default router;

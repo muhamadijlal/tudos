@@ -87,6 +87,7 @@ model User {
   // Relations
   role            Role                @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_user_role")
   ownedProjects   Project[] // User sebagai pemilik project (1:N)
+  ownedEpics      Epic[] // User sebagai lead/owner epic (informational, bukan authority)
   taskAssignments TaskAssignee[] // User sebagai salah satu assignee task (M:N lewat TaskAssignee)
   refreshTokens   RefreshToken[]
   taskComments    TaskComment[]
@@ -114,27 +115,62 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// Project sekarang murni container (gak punya due date sendiri) — due date
+// pindah ke Epic (lihat model Epic di bawah), karena kerjaan nyata dibagi per
+// fitur/epic yang punya target selesai sendiri-sendiri, bukan project secara
+// keseluruhan yang biasanya berjalan terus tanpa batas waktu tetap.
 model Project {
   id          Int       @id @default(autoincrement()) @db.UnsignedInt
   userId      Int       @map("user_id") @db.UnsignedInt
-  code        String    @unique(map: "unq_project_code") @db.VarChar(10)
-  taskCounter Int       @default(0) @map("task_counter")
   name        String    @db.VarChar(100)
   description String?   @db.Text
-  startDate   DateTime? @map("start_date") @db.Timestamp(0)
-  dueDate     DateTime? @map("due_date") @db.Timestamp(0)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0)
 
   // Relations
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_project_user")
-  tasks Task[]
+  epics Epic[]
   notes ProjectNote[]
 
   // Indexes
   @@index([userId], map: "idx_project_user_id")
   @@map("projects")
+}
+
+// Pengelompokan task di dalam 1 project (ala Epic Jira) — task nempel ke
+// Epic, bukan langsung ke Project lagi. `code`/`taskCounter` migrasi dari
+// Project (lihat migration 20260915090000/20260915093000 + backfill_epics.js)
+// — task lama otomatis dapet 1 Epic default "General" per project biar kode
+// task existing (mis. "DEM-6") gak berubah. `userId` cuma informational
+// (lead/owner Epic), OTORITAS tetap di project.userId — sama kayak Task yang
+// gak punya owner sendiri, cuma assignee.
+model Epic {
+  id          Int       @id @default(autoincrement()) @db.UnsignedInt
+  projectId   Int       @map("project_id") @db.UnsignedInt
+  userId      Int?      @map("user_id") @db.UnsignedInt
+  code        String    @unique(map: "unq_epic_code") @db.VarChar(10)
+  taskCounter Int       @default(0) @map("task_counter")
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  // Key warna (lihat EPIC_COLORS di utils/epicColor.js) — di-assign otomatis
+  // round-robin pas epic dibuat, dipakai buat chip/badge epic di Kanban &
+  // Tudos biar gampang bedain task dari epic mana secara visual (ala Jira).
+  color       String    @default("blue") @db.VarChar(20)
+  dueDate     DateTime? @map("due_date") @db.Timestamp(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(0)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_epic_project")
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade, map: "fk_epic_user")
+  tasks   Task[]
+
+  // Indexes
+  @@index([projectId], map: "idx_epic_project_id")
+  @@index([userId], map: "idx_epic_user_id")
+  @@map("epics")
 }
 
 model ProjectNote {
@@ -156,7 +192,7 @@ model ProjectNote {
 
 model Task {
   id          Int          @id @default(autoincrement()) @db.UnsignedInt
-  projectId   Int          @map("project_id") @db.UnsignedInt
+  epicId      Int          @map("epic_id") @db.UnsignedInt
   categoryId  Int          @map("category_id") @db.UnsignedInt
   sequence    Int
   name        String       @db.VarChar(100)
@@ -176,7 +212,7 @@ model Task {
   deletedAt   DateTime?    @map("deleted_at") @db.Timestamp(0)
 
   // Relations
-  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_task_project")
+  epic          Epic                @relation(fields: [epicId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_task_epic")
   category      Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_task_category")
   attachments   TaskAttachment[]
   assignees     TaskAssignee[]
@@ -185,7 +221,7 @@ model Task {
   notifications Notification[]
 
   // Indexes
-  @@unique([projectId, sequence], map: "unq_task_project_sequence")
+  @@unique([epicId, sequence], map: "unq_task_epic_sequence")
   @@index([categoryId], map: "idx_task_category_id")
   @@map("tasks")
 }

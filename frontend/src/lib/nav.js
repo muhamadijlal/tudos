@@ -3,6 +3,7 @@ import {
   Briefcase,
   CalendarX,
   ChartBarHorizontal,
+  Flag,
   Folder,
   House,
   Kanban as KanbanIcon,
@@ -27,6 +28,12 @@ export const NAV_ITEMS = [
     label: "Management Project",
     icon: Briefcase,
     permission: "menu.projectsManage",
+  },
+  {
+    to: "/epics/manage",
+    label: "Management Epic",
+    icon: Flag,
+    permission: "menu.epicsManage",
   },
 ];
 

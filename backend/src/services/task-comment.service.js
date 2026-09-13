@@ -19,7 +19,7 @@ export function findAllByTask(taskId) {
 // orang. Gak notify semua assignee — biar gak spam tiap ada obrolan
 // balik-balikan di 1 thread balasan.
 async function notifyParticipants(task, comment, requester, target) {
-  const code = task.project?.code ? `${task.project.code}-${task.sequence}` : `Task #${task.id}`;
+  const code = task.epic?.code ? `${task.epic.code}-${task.sequence}` : `Task #${task.id}`;
   const excerpt = comment.content.length > 80 ? `${comment.content.slice(0, 80)}...` : comment.content;
 
   if (target) {
@@ -36,7 +36,7 @@ async function notifyParticipants(task, comment, requester, target) {
     return;
   }
 
-  const recipientIds = new Set([...task.assignees.map((a) => a.userId), task.project.userId]);
+  const recipientIds = new Set([...task.assignees.map((a) => a.userId), task.epic.project.userId]);
   recipientIds.delete(requester.id);
   if (recipientIds.size === 0) return;
 

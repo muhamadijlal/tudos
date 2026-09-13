@@ -1,6 +1,4 @@
-import { CodeBadge } from "@/components/CodeBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DatePicker } from "@/components/DatePicker";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { FormRequiredNote, RequiredMark } from "@/components/RequiredMark";
@@ -31,15 +29,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { usePagination } from "@/hooks/use-pagination";
-import { baseProjectCode } from "@/lib/projectCode";
-import { formatDate } from "@/lib/task";
 import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { collectErrors, validateRequired } from "@/lib/validation";
-import { MagnifyingGlass, Plus, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
-const EMPTY_FORM = { name: "", description: "", startDate: "", dueDate: "" };
+const EMPTY_FORM = { name: "", description: "" };
 
 // "Milik Saya": aku ownernya. "Ditugaskan ke Saya": aku bukan owner tapi jadi
 // assignee di salah satu task-nya — sama persis pola filter di ProjectsPage.
@@ -48,11 +44,6 @@ const OWNERSHIP_FILTERS = [
   { value: "mine", label: "Milik Saya" },
   { value: "assigned", label: "Ditugaskan ke Saya" },
 ];
-
-function periodLabel(project) {
-  if (!project.startDate && !project.dueDate) return "-";
-  return `${formatDate(project.startDate)} – ${formatDate(project.dueDate)}`;
-}
 
 export default function ProjectManagementPage() {
   const { user } = useAuth();
@@ -74,9 +65,7 @@ export default function ProjectManagementPage() {
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return projects.filter((p) => {
-      if (query && !p.name.toLowerCase().includes(query) && !p.code?.toLowerCase().includes(query)) {
-        return false;
-      }
+      if (query && !p.name.toLowerCase().includes(query)) return false;
       if (ownershipFilter === "mine" && p.user?.id !== user?.id) return false;
       if (
         ownershipFilter === "assigned" &&
@@ -92,11 +81,10 @@ export default function ProjectManagementPage() {
 
   const exportColumns = useMemo(
     () => [
-      { key: "code", label: "Kode", width: 14 },
+      { key: "epicCount", label: "Epic", width: 10 },
       { key: "name", label: "Nama", width: 26 },
       { key: "description", label: "Deskripsi", width: 32 },
       { key: "owner", label: "Pemilik", width: 20 },
-      { key: "period", label: "Periode", width: 24 },
       { key: "taskCount", label: "Jumlah Task", width: 12 },
     ],
     [],
@@ -104,11 +92,10 @@ export default function ProjectManagementPage() {
   const exportRows = useMemo(
     () =>
       filteredProjects.map((project) => ({
-        code: project.code ?? "-",
+        epicCount: (project.epics ?? []).length,
         name: project.name,
         description: project.description || "-",
         owner: project.user?.name ?? "-",
-        period: periodLabel(project),
         taskCount: project.tasks.length,
       })),
     [filteredProjects],
@@ -143,8 +130,6 @@ export default function ProjectManagementPage() {
     setForm({
       name: project.name,
       description: project.description ?? "",
-      startDate: project.startDate ? project.startDate.slice(0, 10) : "",
-      dueDate: project.dueDate ? project.dueDate.slice(0, 10) : "",
     });
     setFieldErrors({});
     setFormOpen(true);
@@ -160,20 +145,12 @@ export default function ProjectManagementPage() {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    // startDate/dueDate kosong ("") dikirim sebagai null (bukan di-skip) biar
-    // bisa dipakai buat ngosongin tanggal yang sebelumnya udah keisi pas edit.
-    const payload = {
-      ...form,
-      startDate: form.startDate || null,
-      dueDate: form.dueDate || null,
-    };
-
     setIsSubmitting(true);
     try {
       if (editingProject) {
-        await api.put(`/projects/${editingProject.id}`, payload);
+        await api.put(`/projects/${editingProject.id}`, form);
       } else {
-        await api.post("/projects", { ...payload, userId: user.id });
+        await api.post("/projects", { ...form, userId: user.id });
       }
       setFormOpen(false);
       await loadProjects();
@@ -236,7 +213,7 @@ export default function ProjectManagementPage() {
                 <MagnifyingGlass />
               </InputGroupAddon>
               <InputGroupInput
-                placeholder="Cari project (nama/kode)..."
+                placeholder="Cari project (nama)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -268,23 +245,22 @@ export default function ProjectManagementPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="hidden sm:table-cell">Kode</TableHead>
+                <TableHead className="hidden sm:table-cell">Epic</TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead className="hidden md:table-cell">Deskripsi</TableHead>
                 <TableHead className="hidden sm:table-cell">Pemilik</TableHead>
-                <TableHead className="hidden lg:table-cell">Periode</TableHead>
                 <TableHead>Task</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableSkeletonRows columns={7} />
+                <TableSkeletonRows columns={6} />
               ) : (
                 pageItems.map((project) => (
                   <TableRow key={project.id}>
-                    <TableCell className="hidden sm:table-cell">
-                      <CodeBadge>{project.code}</CodeBadge>
+                    <TableCell className="hidden text-muted-foreground sm:table-cell">
+                      {(project.epics ?? []).length}
                     </TableCell>
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell className="hidden max-w-64 truncate text-muted-foreground md:table-cell">
@@ -292,9 +268,6 @@ export default function ProjectManagementPage() {
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {project.user?.name ?? "-"}
-                    </TableCell>
-                    <TableCell className="hidden text-muted-foreground lg:table-cell">
-                      {periodLabel(project)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{project.tasks.length}</TableCell>
                     <TableCell className="text-right">
@@ -356,12 +329,6 @@ export default function ProjectManagementPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               />
               {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
-              {!editingProject && form.name.trim() && (
-                <p className="flex items-center gap-1.5 text-muted-foreground">
-                  Preview kode: <CodeBadge>{baseProjectCode(form.name)}</CodeBadge>
-                  <span>(bisa jadi {baseProjectCode(form.name)}2, dst kalau kodenya udah kepake)</span>
-                </p>
-              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="project-description">Deskripsi</Label>
@@ -370,48 +337,6 @@ export default function ProjectManagementPage() {
                 value={form.description}
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Tanggal Mulai</Label>
-              <div className="flex items-center gap-2">
-                <DatePicker
-                  value={form.startDate}
-                  onChange={(value) => setForm((prev) => ({ ...prev, startDate: value }))}
-                  placeholder="Tanpa tanggal mulai"
-                />
-                {form.startDate && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setForm((prev) => ({ ...prev, startDate: "" }))}
-                    aria-label="Hapus tanggal mulai"
-                  >
-                    <X />
-                  </Button>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Due Date</Label>
-              <div className="flex items-center gap-2">
-                <DatePicker
-                  value={form.dueDate}
-                  onChange={(value) => setForm((prev) => ({ ...prev, dueDate: value }))}
-                  placeholder="Tanpa due date"
-                />
-                {form.dueDate && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setForm((prev) => ({ ...prev, dueDate: "" }))}
-                    aria-label="Hapus due date"
-                  >
-                    <X />
-                  </Button>
-                )}
-              </div>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>

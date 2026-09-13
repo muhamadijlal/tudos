@@ -9,7 +9,7 @@ const RECENT_LIMIT = 50;
 export function findRecentForUser(userId) {
   return prisma.notification.findMany({
     where: { userId },
-    include: { task: { include: { project: true } } },
+    include: { task: { include: { epic: { include: { project: true } } } } },
     orderBy: { createdAt: "desc" },
     take: RECENT_LIMIT,
   });

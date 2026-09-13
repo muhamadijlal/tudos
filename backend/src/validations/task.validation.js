@@ -22,7 +22,7 @@ const userIdsOptional = z.preprocess(
 
 const TaskStoreValidation = z.object({
   body: z.object({
-    projectId: z.coerce.number({ error: "projectId is required" }).int(),
+    epicId: z.coerce.number({ error: "epicId is required" }).int(),
     userIds: userIdsRequired,
     categoryId: z.coerce.number({ error: "categoryId is required" }).int(),
     name: z
@@ -53,7 +53,7 @@ const TaskUpdateValidation = z.object({
       .int("ID harus berupa bilangan bulat"),
   }),
   body: z.object({
-    projectId: z.coerce.number().int().optional(),
+    epicId: z.coerce.number().int().optional(),
     userIds: userIdsOptional,
     categoryId: z.coerce.number().int().optional(),
     name: z

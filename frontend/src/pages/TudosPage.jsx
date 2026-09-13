@@ -5,6 +5,7 @@ import { Combobox } from "@/components/Combobox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DueDateBadge } from "@/components/DueDateBadge";
+import { EpicBadge } from "@/components/EpicBadge";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { ReviewNoteDialog } from "@/components/ReviewNoteDialog";
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
+import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { hasPermission } from "@/lib/permissions";
 import {
@@ -79,6 +81,7 @@ function matchesTaskOwnership(task, ownershipFilter, currentUser) {
 function defaultFilters(canViewAllTasks, currentUser) {
   return {
     projectId: ALL,
+    epicId: ALL,
     categoryId: ALL,
     userId: canViewAllTasks ? ALL : String(currentUser?.id ?? ""),
     priority: ALL,
@@ -96,6 +99,7 @@ function defaultFilters(canViewAllTasks, currentUser) {
 // (project/kategori/assignee/dst) tetap berlaku sama persis.
 function taskMatchesFilters(task, f, { includePeriod }) {
   if (f.projectId !== ALL && String(task.project?.id) !== f.projectId) return false;
+  if (f.epicId !== ALL && String(task.epic?.id) !== f.epicId) return false;
   if (f.categoryId !== ALL && String(task.category?.id) !== f.categoryId) return false;
   if (f.userId !== ALL && !(task.assignees ?? []).some((a) => String(a.id) === f.userId)) return false;
   if (f.priority !== ALL && task.priority !== f.priority) return false;
@@ -135,6 +139,21 @@ export default function TudosPage() {
     );
   }
 
+  function renderEpicOption(option) {
+    if (option.value === ALL) return option.label;
+    return (
+      <span className="flex items-center gap-2">
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            EPIC_COLOR_DOT[option.color] ?? EPIC_COLOR_DOT.slate,
+          )}
+        />
+        {option.label}
+      </span>
+    );
+  }
+
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -161,18 +180,34 @@ export default function TudosPage() {
 
   useEffect(() => {
     const defaults = defaultFilters(canViewAllTasks, currentUser);
-    // Datang dari link "Detail" di dialog project (?projectId=X) — kunci
-    // filter ke project itu & lepas batasan due date biar semua task-nya
+    // Datang dari link "Detail" di dialog project (?projectId=X) atau
+    // "Lihat Semua di Tudos" di EpicDetailPage (?epicId=X) — kunci filter ke
+    // project/epic itu & lepas batasan due date biar semua task-nya
     // kelihatan, bukan cuma yang due date-nya hari ini.
     const projectIdParam = searchParams.get("projectId");
-    const initial = projectIdParam
-      ? { ...defaults, projectId: projectIdParam, dueDateFrom: "", dueDateTo: "" }
-      : defaults;
+    const epicIdParam = searchParams.get("epicId");
+    const initial =
+      projectIdParam || epicIdParam
+        ? {
+            ...defaults,
+            ...(projectIdParam ? { projectId: projectIdParam } : {}),
+            ...(epicIdParam ? { epicId: epicIdParam } : {}),
+            dueDateFrom: "",
+            dueDateTo: "",
+          }
+        : defaults;
     setDraftFilters(initial);
     setAppliedFilters(initial);
-    if (projectIdParam) setSearchParams({}, { replace: true });
+    if (projectIdParam || epicIdParam) setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewAllTasks, currentUser?.id]);
+
+  // Diturunkan dari `projects` yang udah difetch (flatMap epics per project) —
+  // hemat 1 round-trip, gak ada endpoint GET /epics flat.
+  const epics = useMemo(
+    () => projects.flatMap((p) => (p.epics ?? []).map((e) => ({ ...e, projectId: p.id }))),
+    [projects],
+  );
 
   // Diambil dari task yang lagi kemuat, bukan dari /users — jalan juga buat
   // non-admin yang gak bisa akses daftar semua user.
@@ -199,6 +234,7 @@ export default function TudosPage() {
       { key: "code", label: "Kode", width: 14 },
       { key: "name", label: "Task", width: 30 },
       { key: "project", label: "Project", width: 20 },
+      { key: "epic", label: "Epic", width: 18 },
       { key: "category", label: "Kategori", width: 16 },
       { key: "assignee", label: "Assignee", width: 24 },
       { key: "priority", label: "Prioritas", width: 12 },
@@ -213,6 +249,7 @@ export default function TudosPage() {
         code: task.code ?? "-",
         name: task.name,
         project: task.project?.name ?? "-",
+        epic: task.epic?.name ?? "-",
         category: task.category?.name ?? "-",
         assignee: (task.assignees ?? []).map((a) => a.name).join(", ") || "-",
         priority: priorityLabel(task.priority),
@@ -279,6 +316,17 @@ export default function TudosPage() {
         header: "Project",
         cell: (info) => <span className="text-muted-foreground">{info.getValue()}</span>,
         meta: { className: "hidden md:table-cell" },
+      }),
+      columnHelper.accessor((row) => row.epic?.name ?? "-", {
+        id: "epic",
+        header: "Epic",
+        cell: (info) =>
+          info.row.original.epic ? (
+            <EpicBadge epic={info.row.original.epic} />
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          ),
+        meta: { className: "hidden lg:table-cell" },
       }),
       columnHelper.accessor((row) => row.category?.name ?? "-", {
         id: "category",
@@ -364,6 +412,12 @@ export default function TudosPage() {
     setDraftFilters((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Ganti Project di filter -> lepas pilihan Epic (cascading), sama pola
+  // kayak TaskFormDialog.
+  function updateProjectFilter(value) {
+    setDraftFilters((prev) => ({ ...prev, projectId: value, epicId: ALL }));
+  }
+
   function applyFilters() {
     setAppliedFilters(draftFilters);
   }
@@ -377,6 +431,15 @@ export default function TudosPage() {
   const projectFilterOptions = [
     { value: ALL, label: "Semua Project" },
     ...projects.map((p) => ({ value: String(p.id), label: p.name })),
+  ];
+  // Filter Epic cascading dari filter Project (draft) — kalau project-nya
+  // "Semua", tampilin semua epic lintas project.
+  const epicFilterOptions = [
+    { value: ALL, label: "Semua Epic" },
+    ...(draftFilters.projectId === ALL
+      ? epics
+      : epics.filter((e) => String(e.projectId) === draftFilters.projectId)
+    ).map((e) => ({ value: String(e.id), label: e.name, color: e.color })),
   ];
   const categoryFilterOptions = [
     { value: ALL, label: "Semua Kategori" },
@@ -503,7 +566,9 @@ export default function TudosPage() {
           <CardTitle className="flex items-center gap-2">
             <FunnelSimple /> Filter
           </CardTitle>
-          <CardDescription>Saring task berdasarkan project, kategori, assignee, dll.</CardDescription>
+          <CardDescription>
+            Saring task berdasarkan project, epic, kategori, assignee, dll.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center gap-1">
@@ -526,8 +591,22 @@ export default function TudosPage() {
               <Combobox
                 options={projectFilterOptions}
                 value={draftFilters.projectId}
-                onValueChange={(v) => updateDraft("projectId", v)}
+                onValueChange={updateProjectFilter}
                 searchPlaceholder="Cari project..."
+                size="sm"
+                className="w-36"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-muted-foreground">Epic</Label>
+              <Combobox
+                options={epicFilterOptions}
+                value={draftFilters.epicId}
+                onValueChange={(v) => updateDraft("epicId", v)}
+                searchPlaceholder="Cari epic..."
+                renderOption={renderEpicOption}
+                renderValue={renderEpicOption}
                 size="sm"
                 className="w-36"
               />
@@ -709,6 +788,7 @@ export default function TudosPage() {
         onOpenChange={setFormOpen}
         task={editingTask}
         projects={projects}
+        epics={epics}
         users={users}
         categories={categories}
         canAssignOthers={canAssignOthers}

@@ -4,8 +4,11 @@ import { userResource } from "#resources/user.resource.js";
 
 const taskResource = (task) => ({
   id: task.id,
-  code: task.project?.code ? `${task.project.code}-${task.sequence}` : null,
-  project: task.project ? projectResource(task.project) : {},
+  code: task.epic?.code ? `${task.epic.code}-${task.sequence}` : null,
+  project: task.epic?.project ? projectResource(task.epic.project) : {},
+  epic: task.epic
+    ? { id: task.epic.id, code: task.epic.code, name: task.epic.name, color: task.epic.color }
+    : null,
   assignees: (task.assignees ?? []).map((a) => userResource(a.user)),
   category: task.category ? categoryResource(task.category) : null,
   name: task.name,

@@ -4,6 +4,7 @@ import { CodeBadge } from "@/components/CodeBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DueDateBadge } from "@/components/DueDateBadge";
+import { EpicBadge } from "@/components/EpicBadge";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { MultiCombobox } from "@/components/MultiCombobox";
@@ -24,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
+import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { hasPermission } from "@/lib/permissions";
 import {
@@ -99,7 +101,10 @@ function TaskCard({ task, onDragStart, onClick }) {
       className="cursor-grab space-y-3 border border-border bg-card p-4 text-xs hover:bg-muted/50 active:cursor-grabbing"
     >
       <div className="space-y-1">
-        <CodeBadge>{task.code}</CodeBadge>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <CodeBadge>{task.code}</CodeBadge>
+          <EpicBadge epic={task.epic} />
+        </div>
         <p className="font-medium leading-relaxed">{task.name}</p>
         {task.description && (
           <p className="line-clamp-2 text-muted-foreground">{task.description}</p>
@@ -137,6 +142,20 @@ export default function KanbanPage() {
     );
   }
 
+  function renderEpicOption(option) {
+    return (
+      <span className="flex items-center gap-2">
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            EPIC_COLOR_DOT[option.color] ?? EPIC_COLOR_DOT.slate,
+          )}
+        />
+        {option.label}
+      </span>
+    );
+  }
+
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -152,6 +171,7 @@ export default function KanbanPage() {
   const [draftProjectFilter, setDraftProjectFilter] = useState(() =>
     parseIdsParam(searchParams, "project"),
   );
+  const [draftEpicFilter, setDraftEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(() =>
     parseIdsParam(searchParams, "assignee"),
   );
@@ -167,6 +187,7 @@ export default function KanbanPage() {
   const [draftDueDateFrom, setDraftDueDateFrom] = useState(() => parseDateParam(searchParams, "dueFrom"));
   const [draftDueDateTo, setDraftDueDateTo] = useState(() => parseDateParam(searchParams, "dueTo"));
   const [projectFilter, setProjectFilter] = useState(() => parseIdsParam(searchParams, "project"));
+  const [epicFilter, setEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
   const [assigneeFilter, setAssigneeFilter] = useState(() => parseIdsParam(searchParams, "assignee"));
   const [categoryFilter, setCategoryFilter] = useState(() => parseIdsParam(searchParams, "category"));
   const [priorityFilter, setPriorityFilter] = useState(() => parseIdsParam(searchParams, "priority"));
@@ -214,6 +235,7 @@ export default function KanbanPage() {
   useEffect(() => {
     const next = {};
     if (projectFilter.length) next.project = projectFilter.join(",");
+    if (epicFilter.length) next.epic = epicFilter.join(",");
     if (assigneeFilter.length) next.assignee = assigneeFilter.join(",");
     if (categoryFilter.length) next.category = categoryFilter.join(",");
     if (priorityFilter.length) next.priority = priorityFilter.join(",");
@@ -223,6 +245,7 @@ export default function KanbanPage() {
     setSearchParams(next, { replace: true });
   }, [
     projectFilter,
+    epicFilter,
     assigneeFilter,
     categoryFilter,
     priorityFilter,
@@ -238,6 +261,7 @@ export default function KanbanPage() {
 
   function applyFilters() {
     setProjectFilter(draftProjectFilter);
+    setEpicFilter(draftEpicFilter);
     setAssigneeFilter(draftAssigneeFilter);
     setCategoryFilter(draftCategoryFilter);
     setPriorityFilter(draftPriorityFilter);
@@ -249,6 +273,7 @@ export default function KanbanPage() {
 
   function resetFilters() {
     setDraftProjectFilter([]);
+    setDraftEpicFilter([]);
     setDraftAssigneeFilter([]);
     setDraftCategoryFilter([]);
     setDraftPriorityFilter([]);
@@ -256,6 +281,7 @@ export default function KanbanPage() {
     setDraftDueDateFrom("");
     setDraftDueDateTo("");
     setProjectFilter([]);
+    setEpicFilter([]);
     setAssigneeFilter([]);
     setCategoryFilter([]);
     setPriorityFilter([]);
@@ -275,7 +301,20 @@ export default function KanbanPage() {
     setVisibleCounts({});
   }
 
+  // Diturunkan dari `projects` yang udah difetch (flatMap epics per project) —
+  // hemat 1 round-trip, gak ada endpoint GET /epics flat.
+  const epics = projects.flatMap((p) =>
+    (p.epics ?? []).map((e) => ({ ...e, projectId: p.id })),
+  );
+
   const projectFilterOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
+  // Filter Epic cascading dari filter Project (draft) — kalau belum ada
+  // project yang dipilih, tampilin semua epic lintas project.
+  const epicFilterOptions = (
+    draftProjectFilter.length
+      ? epics.filter((e) => draftProjectFilter.includes(String(e.projectId)))
+      : epics
+  ).map((e) => ({ value: String(e.id), label: e.name, color: e.color }));
   const assigneeFilterOptions = users.map((u) => ({ value: String(u.id), label: u.name }));
   const categoryFilterOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
   const priorityFilterOptions = PRIORITY_OPTIONS.map((p) => ({ value: p.value, label: p.label }));
@@ -284,6 +323,7 @@ export default function KanbanPage() {
   function matchesNonPeriodFilters(t) {
     return (
       (projectFilter.length === 0 || projectFilter.includes(String(t.project?.id))) &&
+      (epicFilter.length === 0 || epicFilter.includes(String(t.epic?.id))) &&
       (assigneeFilter.length === 0 ||
         (t.assignees ?? []).some((a) => assigneeFilter.includes(String(a.id)))) &&
       (categoryFilter.length === 0 || categoryFilter.includes(String(t.category?.id))) &&
@@ -301,6 +341,7 @@ export default function KanbanPage() {
     { key: "code", label: "Kode", width: 14 },
     { key: "name", label: "Task", width: 30 },
     { key: "project", label: "Project", width: 20 },
+    { key: "epic", label: "Epic", width: 18 },
     { key: "category", label: "Kategori", width: 16 },
     { key: "assignee", label: "Assignee", width: 24 },
     { key: "priority", label: "Prioritas", width: 12 },
@@ -311,6 +352,7 @@ export default function KanbanPage() {
     code: task.code ?? "-",
     name: task.name,
     project: task.project?.name ?? "-",
+    epic: task.epic?.name ?? "-",
     category: task.category?.name ?? "-",
     assignee: (task.assignees ?? []).map((a) => a.name).join(", ") || "-",
     priority: priorityLabel(task.priority),
@@ -390,7 +432,8 @@ export default function KanbanPage() {
             <FunnelSimple /> Filter
           </CardTitle>
           <CardDescription>
-            Saring board berdasarkan project, kategori, assignee, prioritas, status, dan periode.
+            Saring board berdasarkan project, epic, kategori, assignee, prioritas, status, dan
+            periode.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -417,6 +460,21 @@ export default function KanbanPage() {
                 onValuesChange={setDraftProjectFilter}
                 placeholder="Semua Project"
                 searchPlaceholder="Cari project..."
+                size="sm"
+                className="w-40"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-muted-foreground">Epic</Label>
+              <MultiCombobox
+                options={epicFilterOptions}
+                values={draftEpicFilter}
+                onValuesChange={setDraftEpicFilter}
+                placeholder="Semua Epic"
+                searchPlaceholder="Cari epic..."
+                renderOption={renderEpicOption}
+                renderValue={renderEpicOption}
                 size="sm"
                 className="w-40"
               />
@@ -623,6 +681,7 @@ export default function KanbanPage() {
         onOpenChange={setFormOpen}
         task={null}
         projects={projects}
+        epics={epics}
         users={users}
         categories={categories}
         canAssignOthers={canAssignOthers}

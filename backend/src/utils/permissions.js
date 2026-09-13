@@ -12,6 +12,7 @@ export const PERMISSIONS = [
   { key: "menu.timeline", group: "Menu", label: "Akses menu Timeline" },
   { key: "menu.projects", group: "Menu", label: "Akses menu Project" },
   { key: "menu.projectsManage", group: "Menu", label: "Akses menu Management Project" },
+  { key: "menu.epicsManage", group: "Menu", label: "Akses menu Management Epic" },
   { key: "users.view", group: "Users", label: "Lihat daftar user" },
   { key: "users.update", group: "Users", label: "Edit data user lain" },
   { key: "users.delete", group: "Users", label: "Hapus user" },

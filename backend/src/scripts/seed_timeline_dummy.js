@@ -1,9 +1,12 @@
-// Seed beberapa project dummy dengan rentang tanggal di sekitar hari ini
-// (macam-macam: pendek, panjang, udah lewat due date) — buat demo halaman
-// Timeline. Aman di-rerun, tapi tiap run bikin batch baru (kode project unik).
+// Seed beberapa project dummy (masing-masing 1 epic + 1 task dengan rentang
+// tanggal di sekitar hari ini) — buat demo halaman Timeline. Project sendiri
+// gak lagi punya tanggal (cuma container) — rentang tanggal demo ditaruh di
+// task-nya (Task masih punya startDate+dueDate penuh), Epic dapet dueDate
+// (titik due doang, gak ada rentang). Aman di-rerun, tiap run bikin batch baru
+// (kode epic unik).
 import "dotenv/config";
 import prisma from "#prisma/client.js";
-import { generateUniqueProjectCode } from "#utils/projectCode.js";
+import { generateUniqueEpicCode } from "#utils/epicCode.js";
 
 const OWNER_EMAIL = "m.haidarijl@gmail.com";
 
@@ -30,24 +33,47 @@ const DUMMY_PROJECTS = [
 const owner = await prisma.user.findFirst({ where: { email: OWNER_EMAIL, deletedAt: null } });
 if (!owner) throw new Error(`User dengan email ${OWNER_EMAIL} tidak ditemukan`);
 
+const category = await prisma.category.findFirst({ where: { deletedAt: null } });
+if (!category) throw new Error("Belum ada kategori task — bikin minimal 1 dulu");
+
 for (const p of DUMMY_PROJECTS) {
-  const code = await generateUniqueProjectCode(p.name);
   const startDate = addDays(today, p.startOffset);
   const dueDate = addDays(startDate, p.durationDays);
 
   const project = await prisma.project.create({
     data: {
       userId: owner.id,
-      code,
       name: p.name,
       description: `Dummy project buat demo Timeline (${p.durationDays} hari).`,
-      startDate,
+    },
+  });
+
+  const epicCode = await generateUniqueEpicCode(p.name);
+  const epic = await prisma.epic.create({
+    data: {
+      projectId: project.id,
+      userId: owner.id,
+      code: epicCode,
+      taskCounter: 1,
+      name: p.name,
       dueDate,
     },
   });
 
+  await prisma.task.create({
+    data: {
+      epicId: epic.id,
+      categoryId: category.id,
+      sequence: 1,
+      name: p.name,
+      startDate,
+      dueDate,
+      assignees: { create: [{ userId: owner.id }] },
+    },
+  });
+
   console.log(
-    `${project.code} - ${project.name}: ${startDate.toDateString()} -> ${dueDate.toDateString()}`,
+    `${epic.code} - ${project.name}: ${startDate.toDateString()} -> ${dueDate.toDateString()}`,
   );
 }
 

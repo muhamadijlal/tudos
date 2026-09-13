@@ -1,6 +1,7 @@
 import authenticate from "#middleware/authenticate.middleware.js";
 import authRoutes from "#routes/auth.routes.js";
 import categoryRoutes from "#routes/category.routes.js";
+import epicRoutes from "#routes/epic.routes.js";
 import exportRoutes from "#routes/export.routes.js";
 import nationalHolidayRoutes from "#routes/national-holiday.routes.js";
 import notificationRoutes from "#routes/notification.routes.js";
@@ -21,6 +22,7 @@ router.use("/users", authenticate, userRoutes);
 router.use("/profile-pictures", profilePictureRoutes);
 router.use("/projects", authenticate, projectRoutes);
 router.use("/project-notes", authenticate, projectNoteRoutes);
+router.use("/epics", authenticate, epicRoutes);
 router.use("/tasks", authenticate, taskRoutes);
 router.use("/task-comments", authenticate, taskCommentRoutes);
 router.use("/categories", authenticate, categoryRoutes);

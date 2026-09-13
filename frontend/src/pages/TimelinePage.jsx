@@ -50,8 +50,9 @@ function mondayOf(date) {
   return addDays(startOfDay(date), diff);
 }
 
-// Project/task dianggap punya "rentang" cuma kalau minimal salah satu dari
+// Epic/task dianggap punya "rentang" cuma kalau minimal salah satu dari
 // startDate/dueDate keisi — yang lain fallback ke situ juga (jadi bar 1 hari).
+// Project gak dipanggil pakai helper ini lagi — dia gak punya tanggal sendiri.
 function dateRange(item) {
   const due = item.dueDate ? new Date(item.dueDate) : null;
   const start = item.startDate ? new Date(item.startDate) : due;
@@ -93,7 +94,8 @@ export default function TimelinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [detailTask, setDetailTask] = useState(null);
-  const [expanded, setExpanded] = useState(() => new Set());
+  const [expandedProjects, setExpandedProjects] = useState(() => new Set());
+  const [expandedEpics, setExpandedEpics] = useState(() => new Set());
 
   // draftOwnerFilter = lagi diutak-atik di dropdown, ownerFilter = yang
   // beneran dipakai buat nyaring baris. Baru nyambung pas tombol "Filter"
@@ -120,11 +122,20 @@ export default function TimelinePage() {
     setOwnerFilter([]);
   }
 
-  function toggleExpanded(projectId) {
-    setExpanded((prev) => {
+  function toggleExpandedProject(projectId) {
+    setExpandedProjects((prev) => {
       const next = new Set(prev);
       if (next.has(projectId)) next.delete(projectId);
       else next.add(projectId);
+      return next;
+    });
+  }
+
+  function toggleExpandedEpic(epicId) {
+    setExpandedEpics((prev) => {
+      const next = new Set(prev);
+      if (next.has(epicId)) next.delete(epicId);
+      else next.add(epicId);
       return next;
     });
   }
@@ -160,48 +171,80 @@ export default function TimelinePage() {
     return Array.from(map, ([id, name]) => ({ value: String(id), label: name }));
   }, [projects]);
 
-  // Baris di-flatten: tiap project (kalau lagi di-expand) langsung diikuti
-  // sub-baris task-nya — ala Jira Timeline yang epic-nya bisa di-breakdown.
+  // Baris di-flatten 3 level: Project -> Epic -> Task, tiap level langsung
+  // diikuti sub-baris-nya kalau lagi di-expand — ala Jira Timeline. Project
+  // sendiri gak lagi punya tanggal (murni container) — jadi baris Project
+  // SELALU tampil (gak ikut difilter/diurutin berdasarkan periode kayak
+  // dulu), sama pola kayak Epic yang gak punya due date.
   const rows = projects
     .filter((p) => ownerFilter.length === 0 || ownerFilter.includes(String(p.user?.id)))
-    .map((project) => ({ project, range: dateRange(project) }))
-    .filter(({ range }) => range && range.start <= rangeEnd && range.end >= rangeStart)
-    .sort((a, b) => a.range.start - b.range.start)
-    .flatMap(({ project, range }) => {
-      // Task project ini yang rentangnya overlap sama periode yang lagi
-      // ditampilin (bukan seluruh task project itu) — dipakai buat nentuin
-      // ada-gaknya isi expand DI PERIODE INI. Sebelumnya `hasTasks` cuma cek
-      // "project ini punya task" tanpa peduli periode, jadi caret-nya bisa
-      // aktif padahal expand-nya bakal kosong (task-nya ada tapi jatuhnya di
-      // periode lain).
-      const visibleTaskEntries = project.tasks
-        .map((task) => ({ project, task, range: dateRange(task) }))
-        .filter(({ range: r }) => r && r.start <= rangeEnd && r.end >= rangeStart);
-
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((project) => {
       const projectRow = {
         type: "project",
         key: `p${project.id}`,
         project,
-        range,
-        overdue: range.end < today,
-        hasTasks: visibleTaskEntries.length > 0,
-        ...layoutBar(range, rangeStart, rangeEnd),
+        range: null,
+        overdue: false,
+        hasTasks: (project.epics ?? []).length > 0,
+        offset: 0,
+        duration: 0,
+        clippedLeft: false,
+        clippedRight: false,
       };
 
-      if (!expanded.has(project.id)) return [projectRow];
+      if (!expandedProjects.has(project.id)) return [projectRow];
 
-      const taskRows = visibleTaskEntries
-        .sort((a, b) => a.range.start - b.range.start)
-        .map(({ project: p, task, range: r }) => ({
-          type: "task",
-          key: `t${task.id}`,
-          project: p,
-          task,
-          range: r,
-          ...layoutBar(r, rangeStart, rangeEnd),
-        }));
+      // Task project ini dikelompokkan per epic (lewat task.epicId, dari
+      // project.resource.js#projectTaskSummary) — dipakai buat nentuin isi
+      // expand tiap epic DI PERIODE INI.
+      const tasksByEpic = new Map();
+      for (const task of project.tasks) {
+        if (!tasksByEpic.has(task.epicId)) tasksByEpic.set(task.epicId, []);
+        tasksByEpic.get(task.epicId).push(task);
+      }
 
-      return [projectRow, ...taskRows];
+      const epicRows = (project.epics ?? []).flatMap((epic) => {
+        const epicRange = dateRange(epic);
+        const visibleTaskEntries = (tasksByEpic.get(epic.id) ?? [])
+          .map((task) => ({ task, range: dateRange(task) }))
+          .filter(({ range: r }) => r && r.start <= rangeEnd && r.end >= rangeStart);
+
+        // Epic SELALU tampil sebagai baris grup kalau project-nya expanded —
+        // gak ikut aturan "hilang kalau gak match filter tanggal" kayak
+        // Project/Task (disepakati bareng user). Bar tanggal-nya cuma
+        // digambar kalau epic-nya beneran punya rentang (`epicRange` non-null).
+        const epicRow = {
+          type: "epic",
+          key: `e${epic.id}`,
+          project,
+          epic,
+          range: epicRange,
+          overdue: epicRange ? epicRange.end < today : false,
+          hasTasks: visibleTaskEntries.length > 0,
+          ...(epicRange
+            ? layoutBar(epicRange, rangeStart, rangeEnd)
+            : { offset: 0, duration: 0, clippedLeft: false, clippedRight: false }),
+        };
+
+        if (!expandedEpics.has(epic.id)) return [epicRow];
+
+        const taskRows = visibleTaskEntries
+          .sort((a, b) => a.range.start - b.range.start)
+          .map(({ task, range: r }) => ({
+            type: "task",
+            key: `t${task.id}`,
+            project,
+            epic,
+            task,
+            range: r,
+            ...layoutBar(r, rangeStart, rangeEnd),
+          }));
+
+        return [epicRow, ...taskRows];
+      });
+
+      return [projectRow, ...epicRows];
     });
 
   const exportColumns = [
@@ -209,34 +252,51 @@ export default function TimelinePage() {
     { key: "code", label: "Kode", width: 14 },
     { key: "name", label: "Nama", width: 30 },
     { key: "project", label: "Project", width: 24 },
+    { key: "epic", label: "Epic", width: 20 },
     { key: "assignee", label: "Assignee/Pemilik", width: 24 },
     { key: "status", label: "Status", width: 16 },
     { key: "startDate", label: "Tanggal Mulai", width: 14 },
     { key: "dueDate", label: "Due Date", width: 14 },
   ];
-  const exportRows = rows.map((row) =>
-    row.type === "project"
-      ? {
-          type: "Project",
-          code: row.project.code ?? "-",
-          name: row.project.name,
-          project: "-",
-          assignee: row.project.user?.name ?? "-",
-          status: row.overdue ? "Lewat due date" : "Dalam jadwal",
-          startDate: row.range.start ? formatDate(row.range.start) : "-",
-          dueDate: row.range.end ? formatDate(row.range.end) : "-",
-        }
-      : {
-          type: "Task",
-          code: row.task.code ?? "-",
-          name: row.task.name,
-          project: row.project.name,
-          assignee: (row.task.assignees ?? []).map((a) => a.name).join(", ") || "-",
-          status: statusLabel(row.task.status),
-          startDate: row.range.start ? formatDate(row.range.start) : "-",
-          dueDate: row.range.end ? formatDate(row.range.end) : "-",
-        },
-  );
+  const exportRows = rows.map((row) => {
+    if (row.type === "project") {
+      return {
+        type: "Project",
+        code: "-",
+        name: row.project.name,
+        project: "-",
+        epic: "-",
+        assignee: row.project.user?.name ?? "-",
+        status: "-",
+        startDate: "-",
+        dueDate: "-",
+      };
+    }
+    if (row.type === "epic") {
+      return {
+        type: "Epic",
+        code: row.epic.code ?? "-",
+        name: row.epic.name,
+        project: row.project.name,
+        epic: "-",
+        assignee: row.epic.user?.name ?? "-",
+        status: row.range ? (row.overdue ? "Lewat due date" : "Dalam jadwal") : "Tanpa due date",
+        startDate: row.range?.start ? formatDate(row.range.start) : "-",
+        dueDate: row.range?.end ? formatDate(row.range.end) : "-",
+      };
+    }
+    return {
+      type: "Task",
+      code: row.task.code ?? "-",
+      name: row.task.name,
+      project: row.project.name,
+      epic: row.epic.name,
+      assignee: (row.task.assignees ?? []).map((a) => a.name).join(", ") || "-",
+      status: statusLabel(row.task.status),
+      startDate: row.range.start ? formatDate(row.range.start) : "-",
+      dueDate: row.range.end ? formatDate(row.range.end) : "-",
+    };
+  });
 
   const days = Array.from({ length: RANGE_DAYS }, (_, i) => addDays(rangeStart, i));
   const gridWidth = RANGE_DAYS * DAY_WIDTH;
@@ -246,6 +306,7 @@ export default function TimelinePage() {
 
   function openRowDetail(row) {
     if (row.type === "project") navigate(`/projects/${row.project.id}`);
+    else if (row.type === "epic") navigate(`/projects/${row.project.id}/epics/${row.epic.id}`);
     else setDetailTask(row.task);
   }
 
@@ -381,19 +442,21 @@ export default function TimelinePage() {
                       className="flex items-center border-b border-border/60 hover:bg-muted/50"
                       style={{ height: ROW_HEIGHT }}
                     >
-                      {row.type === "project" ? (
+                      {row.type === "project" && (
                         <>
                           <button
                             type="button"
-                            onClick={() => toggleExpanded(row.project.id)}
+                            onClick={() => toggleExpandedProject(row.project.id)}
                             disabled={!row.hasTasks}
-                            aria-label={expanded.has(row.project.id) ? "Tutup task" : "Buka task"}
+                            aria-label={
+                              expandedProjects.has(row.project.id) ? "Tutup epic" : "Buka epic"
+                            }
                             className="flex h-full w-6 shrink-0 items-center justify-center text-muted-foreground disabled:opacity-0"
                           >
                             <CaretDown
                               className={cn(
                                 "size-3 transition-transform",
-                                !expanded.has(row.project.id) && "-rotate-90",
+                                !expandedProjects.has(row.project.id) && "-rotate-90",
                               )}
                             />
                           </button>
@@ -407,15 +470,42 @@ export default function TimelinePage() {
                               name={row.project.user?.name}
                               size="xs"
                             />
-                            <CodeBadge className="shrink-0">{row.project.code}</CodeBadge>
                             <span className="min-w-0 flex-1 truncate">{row.project.name}</span>
                           </button>
                         </>
-                      ) : (
+                      )}
+                      {row.type === "epic" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandedEpic(row.epic.id)}
+                            disabled={!row.hasTasks}
+                            aria-label={expandedEpics.has(row.epic.id) ? "Tutup task" : "Buka task"}
+                            className="flex h-full w-6 shrink-0 items-center justify-center pl-2 text-muted-foreground disabled:opacity-0"
+                          >
+                            <CaretDown
+                              className={cn(
+                                "size-3 transition-transform",
+                                !expandedEpics.has(row.epic.id) && "-rotate-90",
+                              )}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openRowDetail(row)}
+                            className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left"
+                          >
+                            <AssigneeAvatar id={row.epic.user?.id} name={row.epic.user?.name} size="xs" />
+                            <CodeBadge className="shrink-0">{row.epic.code}</CodeBadge>
+                            <span className="min-w-0 flex-1 truncate">{row.epic.name}</span>
+                          </button>
+                        </>
+                      )}
+                      {row.type === "task" && (
                         <button
                           type="button"
                           onClick={() => openRowDetail(row)}
-                          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 pl-8 text-left"
+                          className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 pl-14 text-left"
                         >
                           <AssigneeAvatarGroup assignees={row.task.assignees} size="xs" />
                           <CodeBadge className="shrink-0">{row.task.code}</CodeBadge>
@@ -450,10 +540,17 @@ export default function TimelinePage() {
                     </div>
 
                     {rows.map((row, i) => {
+                      // Epic tanpa dueDate/startDate (`range` null) tetap tampil
+                      // sebagai baris grup di kolom label, tapi gak ada bar
+                      // tanggal yang bisa digambar di sini.
+                      if (!row.range) return null;
+
                       const label =
                         row.type === "project"
-                          ? `${row.project.code} · ${row.project.name}`
-                          : `${row.task.code} · ${row.task.name}`;
+                          ? row.project.name
+                          : row.type === "epic"
+                            ? `${row.epic.code} · ${row.epic.name}`
+                            : `${row.task.code} · ${row.task.name}`;
                       return (
                         <button
                           key={row.key}
@@ -462,9 +559,9 @@ export default function TimelinePage() {
                           title={`${label} (${formatDate(row.range.start)} – ${formatDate(row.range.end)})`}
                           className={cn(
                             "absolute flex cursor-pointer items-center",
-                            row.type === "project"
-                              ? cn("h-5", row.overdue ? "bg-destructive" : "bg-primary")
-                              : cn("h-4", STATUS_DOT[row.task.status]),
+                            row.type === "task"
+                              ? cn("h-4", STATUS_DOT[row.task.status])
+                              : cn("h-5", row.overdue ? "bg-destructive" : "bg-primary"),
                             !row.clippedLeft && "rounded-l-sm",
                             !row.clippedRight && "rounded-r-sm",
                           )}
@@ -472,8 +569,7 @@ export default function TimelinePage() {
                             left: row.offset * DAY_WIDTH + 2,
                             width: row.duration * DAY_WIDTH - 4,
                             top:
-                              i * ROW_HEIGHT +
-                              (ROW_HEIGHT - (row.type === "project" ? 20 : 16)) / 2,
+                              i * ROW_HEIGHT + (ROW_HEIGHT - (row.type === "task" ? 16 : 20)) / 2,
                           }}
                         >
                           <span className="truncate px-1.5 text-[10px] leading-none font-medium text-white">
@@ -502,11 +598,11 @@ export default function TimelinePage() {
       <div className="flex shrink-0 flex-wrap items-center gap-3 text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-primary" />
-          Project dalam jadwal
+          Epic dalam jadwal
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-destructive" />
-          Project lewat due date
+          Epic lewat due date
         </span>
         <span className="text-border">|</span>
         <span>Task di-warnai sesuai status (sama kayak Kanban)</span>

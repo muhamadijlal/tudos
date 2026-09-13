@@ -1,16 +1,23 @@
 import prisma from "#prisma/client.js";
 import ApiError from "#utils/ApiError.js";
-import { generateUniqueProjectCode } from "#utils/projectCode.js";
 
 // `assigneeId` diisi kalau caller-nya member — member cuma boleh lihat
-// project yang (a) dia sendiri owner-nya (walau belum ada task sama sekali),
-// atau (b) punya minimal 1 task dengan dirinya sebagai salah satu assignee-nya.
-// Admin (permission projects.viewAll) lihat semua.
+// project yang (a) dia sendiri owner-nya (walau belum ada epic/task sama
+// sekali), atau (b) punya minimal 1 task (lewat salah satu epic-nya) dengan
+// dirinya sebagai salah satu assignee-nya. Admin (permission projects.viewAll)
+// lihat semua.
 function memberScope(assigneeId) {
   return {
     OR: [
       { userId: assigneeId },
-      { tasks: { some: { assignees: { some: { userId: assigneeId } }, deletedAt: null } } },
+      {
+        epics: {
+          some: {
+            deletedAt: null,
+            tasks: { some: { assignees: { some: { userId: assigneeId } }, deletedAt: null } },
+          },
+        },
+      },
     ],
   };
 }
@@ -23,9 +30,15 @@ export function findAll({ assigneeId } = {}) {
     },
     include: {
       user: true,
-      tasks: {
+      epics: {
         where: { deletedAt: null },
-        include: { assignees: { include: { user: true } } },
+        include: {
+          user: true,
+          tasks: {
+            where: { deletedAt: null },
+            include: { assignees: { include: { user: true } } },
+          },
+        },
       },
     },
   });
@@ -40,14 +53,20 @@ export async function findById(projectId, { assigneeId } = {}) {
     },
     include: {
       user: true,
-      tasks: {
+      epics: {
         where: { deletedAt: null },
         include: {
-          assignees: { include: { user: true } },
-          category: true,
-          attachments: true,
+          user: true,
+          tasks: {
+            where: { deletedAt: null },
+            include: {
+              assignees: { include: { user: true } },
+              category: true,
+              attachments: true,
+            },
+            orderBy: { createdAt: "desc" },
+          },
         },
-        orderBy: { createdAt: "desc" },
       },
     },
   });
@@ -68,9 +87,7 @@ export async function create(data) {
     throw new ApiError(404, "User not found");
   }
 
-  // Kode ala Jira (mis. "WEB") di-generate otomatis dari nama, gak diisi user.
-  const code = await generateUniqueProjectCode(data.name);
-  return prisma.project.create({ data: { ...data, code } });
+  return prisma.project.create({ data });
 }
 
 // Cuma owner project yang boleh edit/hapus project-nya — user lain (mis.
@@ -106,7 +123,7 @@ export async function remove(projectId, requesterId) {
   assertIsOwner(project, requesterId);
 
   const taskCount = await prisma.task.count({
-    where: { projectId, deletedAt: null },
+    where: { deletedAt: null, epic: { projectId, deletedAt: null } },
   });
 
   if (taskCount > 0) {
