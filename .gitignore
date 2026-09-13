@@ -26,6 +26,10 @@ backend/storage/
 # Claude Code session state (lokal per-mesin, bukan bagian dari app)
 .claude/
 
+# Referensi/aset lokal dipakai selama development (screenshot, template
+# reference), bukan bagian dari source code aplikasi.
+.assets/
+
 # OS / editor
 .DS_Store
 *.local
