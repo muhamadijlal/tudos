@@ -20,6 +20,7 @@ const epicBody = {
     .max(100, "Nama epic maksimal 100 karakter")
     .trim(),
   description: z.string().max(65535, "Deskripsi maksimal 65535 karakter").optional(),
+  startDate: z.coerce.date().optional().nullable(),
   dueDate: z.coerce.date().optional().nullable(),
   userId: z.coerce.number().int().optional().nullable(),
 };

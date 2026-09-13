@@ -33,16 +33,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { usePagination } from "@/hooks/use-pagination";
 import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
+import { epicPeriodLabel } from "@/lib/epic";
 import { EPIC_COLOR_DOT, EPIC_COLOR_OPTIONS } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
-import { formatDate } from "@/lib/task";
 import { cn } from "@/lib/utils";
 import { collectErrors, validateRequired } from "@/lib/validation";
 import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 
 const ALL = "all";
-const EMPTY_FORM = { projectId: "", name: "", description: "", dueDate: "", userId: "", color: "" };
+const EMPTY_FORM = {
+  projectId: "",
+  name: "",
+  description: "",
+  startDate: "",
+  dueDate: "",
+  userId: "",
+  color: "",
+};
 
 // "Milik Saya": aku owner project-nya (epic gak punya owner sendiri buat
 // otorisasi — authority-nya tetap project.userId, sama kayak Task) — sama
@@ -124,7 +132,7 @@ export default function EpicManagementPage() {
       { key: "name", label: "Nama", width: 26 },
       { key: "project", label: "Project", width: 22 },
       { key: "owner", label: "Owner", width: 20 },
-      { key: "dueDate", label: "Due Date", width: 14 },
+      { key: "period", label: "Periode", width: 24 },
       { key: "progress", label: "Progress", width: 12 },
       { key: "taskCount", label: "Jumlah Task", width: 12 },
     ],
@@ -137,7 +145,7 @@ export default function EpicManagementPage() {
         name: epic.name,
         project: epic.project.name,
         owner: epic.user?.name ?? "-",
-        dueDate: epic.dueDate ? formatDate(epic.dueDate) : "-",
+        period: epicPeriodLabel(epic),
         progress: `${epic.progress.percent}%`,
         taskCount: epic.progress.total,
       })),
@@ -178,6 +186,7 @@ export default function EpicManagementPage() {
       projectId: String(epic.projectId),
       name: epic.name,
       description: epic.description ?? "",
+      startDate: epic.startDate ? epic.startDate.slice(0, 10) : "",
       dueDate: epic.dueDate ? epic.dueDate.slice(0, 10) : "",
       userId: epic.user?.id ? String(epic.user.id) : "",
       color: epic.color,
@@ -202,6 +211,7 @@ export default function EpicManagementPage() {
     const payload = {
       name: form.name,
       description: form.description,
+      startDate: form.startDate || null,
       dueDate: form.dueDate || null,
       userId: form.userId ? Number(form.userId) : null,
       // Warna cuma dikirim pas edit — pas create selalu di-assign otomatis
@@ -323,7 +333,7 @@ export default function EpicManagementPage() {
                 <TableHead>Nama</TableHead>
                 <TableHead className="hidden sm:table-cell">Project</TableHead>
                 <TableHead className="hidden md:table-cell">Owner</TableHead>
-                <TableHead className="hidden lg:table-cell">Due Date</TableHead>
+                <TableHead className="hidden lg:table-cell">Periode</TableHead>
                 <TableHead className="hidden sm:table-cell">Progress</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -353,7 +363,7 @@ export default function EpicManagementPage() {
                       {epic.user?.name ?? "-"}
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground lg:table-cell">
-                      {epic.dueDate ? formatDate(epic.dueDate) : "-"}
+                      {epicPeriodLabel(epic)}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <EpicProgressBar progress={epic.progress} />
@@ -446,13 +456,23 @@ export default function EpicManagementPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Due Date</Label>
-              <DatePicker
-                value={form.dueDate}
-                onChange={(value) => setForm((prev) => ({ ...prev, dueDate: value }))}
-                placeholder="Tanpa due date"
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label>Tanggal Mulai</Label>
+                <DatePicker
+                  value={form.startDate}
+                  onChange={(value) => setForm((prev) => ({ ...prev, startDate: value }))}
+                  placeholder="Tanpa tanggal mulai"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Due Date</Label>
+                <DatePicker
+                  value={form.dueDate}
+                  onChange={(value) => setForm((prev) => ({ ...prev, dueDate: value }))}
+                  placeholder="Tanpa due date"
+                />
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Owner</Label>

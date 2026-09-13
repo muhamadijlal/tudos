@@ -71,6 +71,7 @@ export async function create(projectId, requesterId, data) {
       projectId,
       name: data.name,
       description: data.description,
+      startDate: data.startDate,
       dueDate: data.dueDate,
       userId: data.userId ?? null,
       code,
@@ -96,6 +97,7 @@ export async function update(epicId, requesterId, data) {
     data: {
       name: data.name,
       description: data.description,
+      startDate: data.startDate,
       dueDate: data.dueDate,
       userId: data.userId,
       color: data.color,

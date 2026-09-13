@@ -17,9 +17,14 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
 import { filenamePeriodSuffix } from "@/lib/export";
-import { formatDate, statusLabel, STATUS_DOT } from "@/lib/task";
+import { formatDate, STATUS_DOT, statusLabel } from "@/lib/task";
 import { cn } from "@/lib/utils";
-import { CaretDown, CaretLeft, CaretRight, FunnelSimple } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  CaretLeft,
+  CaretRight,
+  FunnelSimple,
+} from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -103,14 +108,48 @@ export default function TimelinePage() {
   const [draftOwnerFilter, setDraftOwnerFilter] = useState([]);
   const [ownerFilter, setOwnerFilter] = useState([]);
   const [anchor, setAnchor] = useState(() => mondayOf(new Date()));
-  const [feedback, setFeedback] = useState({ open: false, variant: "error", title: "", description: "" });
+  const [feedback, setFeedback] = useState({
+    open: false,
+    variant: "error",
+    title: "",
+    description: "",
+  });
   const headerScrollRef = useRef(null);
+  const bodyRef = useRef(null);
+  // Tinggi kontainer body yang beneran kelihatan (viewport) — dipakai biar
+  // grid (garis weekend/hari-ini) tetap ngisi sampe bawah walau row-nya
+  // dikit (gak nyisain area putih kosong tanpa grid).
+  const [visibleBodyHeight, setVisibleBodyHeight] = useState(0);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      setVisibleBodyHeight(entries[0].contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Header hari cuma ngikutin scroll horizontal dari body (overflow-x-nya
   // di-disable di JSX) — kalau dua-duanya bisa di-scroll user & saling
   // nge-sync, gampang jadi ping-pong scroll event.
   function handleBodyScroll(e) {
-    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    if (headerScrollRef.current)
+      headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+  }
+
+  // Scrollbar panel grid sengaja disembunyiin (lihat class scrollbar-hidden)
+  // — biar tetep gampang di-scroll pake mouse wheel biasa (bukan cuma
+  // trackpad/shift+wheel), scroll vertikal (deltaY) di-alihin jadi scroll
+  // horizontal selama grid-nya emang punya overflow horizontal. Kalau user
+  // udah scroll horizontal sendiri (trackpad, deltaX dominan), biarin native.
+  function handleGridWheel(e) {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    el.scrollLeft += e.deltaY;
   }
 
   function applyFilters() {
@@ -168,7 +207,10 @@ export default function TimelinePage() {
     for (const p of projects) {
       if (p.user?.id) map.set(p.user.id, p.user.name);
     }
-    return Array.from(map, ([id, name]) => ({ value: String(id), label: name }));
+    return Array.from(map, ([id, name]) => ({
+      value: String(id),
+      label: name,
+    }));
   }, [projects]);
 
   // Baris di-flatten 3 level: Project -> Epic -> Task, tiap level langsung
@@ -177,7 +219,10 @@ export default function TimelinePage() {
   // SELALU tampil (gak ikut difilter/diurutin berdasarkan periode kayak
   // dulu), sama pola kayak Epic yang gak punya due date.
   const rows = projects
-    .filter((p) => ownerFilter.length === 0 || ownerFilter.includes(String(p.user?.id)))
+    .filter(
+      (p) =>
+        ownerFilter.length === 0 || ownerFilter.includes(String(p.user?.id)),
+    )
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((project) => {
       const projectRow = {
@@ -206,25 +251,46 @@ export default function TimelinePage() {
 
       const epicRows = (project.epics ?? []).flatMap((epic) => {
         const epicRange = dateRange(epic);
+        // Bar cuma boleh digambar kalau rentang epic-nya beneran overlap
+        // sama periode yang lagi ditampilin — kalau enggak, layoutBar() bakal
+        // ngasilin `duration` negatif (clippedEnd < clippedStart) yang bikin
+        // bar-nya nyangkut di offset 0 (kepentok kiri) di periode manapun,
+        // padahal harusnya gak digambar sama sekali.
+        const epicVisibleRange =
+          epicRange &&
+          epicRange.start <= rangeEnd &&
+          epicRange.end >= rangeStart
+            ? epicRange
+            : null;
         const visibleTaskEntries = (tasksByEpic.get(epic.id) ?? [])
           .map((task) => ({ task, range: dateRange(task) }))
-          .filter(({ range: r }) => r && r.start <= rangeEnd && r.end >= rangeStart);
+          .filter(
+            ({ range: r }) => r && r.start <= rangeEnd && r.end >= rangeStart,
+          );
 
         // Epic SELALU tampil sebagai baris grup kalau project-nya expanded —
         // gak ikut aturan "hilang kalau gak match filter tanggal" kayak
         // Project/Task (disepakati bareng user). Bar tanggal-nya cuma
-        // digambar kalau epic-nya beneran punya rentang (`epicRange` non-null).
+        // digambar kalau rentangnya overlap sama periode ini
+        // (`epicVisibleRange` non-null) — `overdue` tetap dihitung dari
+        // rentang ASLI-nya (`epicRange`), gak peduli lagi kelihatan di
+        // periode ini atau enggak.
         const epicRow = {
           type: "epic",
           key: `e${epic.id}`,
           project,
           epic,
-          range: epicRange,
+          range: epicVisibleRange,
           overdue: epicRange ? epicRange.end < today : false,
           hasTasks: visibleTaskEntries.length > 0,
-          ...(epicRange
-            ? layoutBar(epicRange, rangeStart, rangeEnd)
-            : { offset: 0, duration: 0, clippedLeft: false, clippedRight: false }),
+          ...(epicVisibleRange
+            ? layoutBar(epicVisibleRange, rangeStart, rangeEnd)
+            : {
+                offset: 0,
+                duration: 0,
+                clippedLeft: false,
+                clippedRight: false,
+              }),
         };
 
         if (!expandedEpics.has(epic.id)) return [epicRow];
@@ -273,6 +339,11 @@ export default function TimelinePage() {
       };
     }
     if (row.type === "epic") {
+      // Sengaja pakai tanggal ASLI epic (row.epic.startDate/dueDate), bukan
+      // row.range yang cuma keisi kalau overlap sama periode yang lagi
+      // ditampilin — epic yang tanggalnya di luar periode ini tetap harus
+      // ke-export dengan tanggal aslinya, bukan "-".
+      const hasDate = Boolean(row.epic.startDate || row.epic.dueDate);
       return {
         type: "Epic",
         code: row.epic.code ?? "-",
@@ -280,9 +351,13 @@ export default function TimelinePage() {
         project: row.project.name,
         epic: "-",
         assignee: row.epic.user?.name ?? "-",
-        status: row.range ? (row.overdue ? "Lewat due date" : "Dalam jadwal") : "Tanpa due date",
-        startDate: row.range?.start ? formatDate(row.range.start) : "-",
-        dueDate: row.range?.end ? formatDate(row.range.end) : "-",
+        status: hasDate
+          ? row.overdue
+            ? "Lewat due date"
+            : "Dalam jadwal"
+          : "Tanpa due date",
+        startDate: row.epic.startDate ? formatDate(row.epic.startDate) : "-",
+        dueDate: row.epic.dueDate ? formatDate(row.epic.dueDate) : "-",
       };
     }
     return {
@@ -298,15 +373,21 @@ export default function TimelinePage() {
     };
   });
 
-  const days = Array.from({ length: RANGE_DAYS }, (_, i) => addDays(rangeStart, i));
+  const days = Array.from({ length: RANGE_DAYS }, (_, i) =>
+    addDays(rangeStart, i),
+  );
   const gridWidth = RANGE_DAYS * DAY_WIDTH;
-  const bodyHeight = rows.length * ROW_HEIGHT;
+  // Minimal setinggi kontainer yang beneran kelihatan (viewport), biar grid
+  // tetap ngisi sampe bawah walau row-nya dikit — bukan cuma pas-pasan
+  // ngikutin jumlah row.
+  const bodyHeight = Math.max(rows.length * ROW_HEIGHT, visibleBodyHeight);
 
   const rangeLabel = `${rangeStart.toLocaleDateString("id-ID", { day: "numeric", month: "long" })} – ${rangeEnd.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
 
   function openRowDetail(row) {
     if (row.type === "project") navigate(`/projects/${row.project.id}`);
-    else if (row.type === "epic") navigate(`/projects/${row.project.id}/epics/${row.epic.id}`);
+    else if (row.type === "epic")
+      navigate(`/projects/${row.project.id}/epics/${row.epic.id}`);
     else setDetailTask(row.task);
   }
 
@@ -317,7 +398,9 @@ export default function TimelinePage() {
           <CardTitle className="flex items-center gap-2">
             <FunnelSimple /> Filter
           </CardTitle>
-          <CardDescription>Saring timeline berdasarkan pemilik project.</CardDescription>
+          <CardDescription>
+            Saring timeline berdasarkan pemilik project.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-2">
@@ -339,7 +422,12 @@ export default function TimelinePage() {
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={resetFilters}
+              >
                 Reset Filter
               </Button>
             </div>
@@ -359,7 +447,12 @@ export default function TimelinePage() {
               rows={exportRows}
               period={filenamePeriodSuffix(rangeStart, rangeEnd)}
               onError={(message) =>
-                setFeedback({ open: true, variant: "error", title: "Gagal export", description: message })
+                setFeedback({
+                  open: true,
+                  variant: "error",
+                  title: "Gagal export",
+                  description: message,
+                })
               }
             />
             <Button
@@ -409,7 +502,10 @@ export default function TimelinePage() {
                   Project
                 </div>
                 <div ref={headerScrollRef} className="flex-1 overflow-hidden">
-                  <div className="flex" style={{ width: gridWidth, height: HEADER_HEIGHT }}>
+                  <div
+                    className="flex"
+                    style={{ width: gridWidth, height: HEADER_HEIGHT }}
+                  >
                     {days.map((d, i) => {
                       const isToday = d.getTime() === today.getTime();
                       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -419,7 +515,8 @@ export default function TimelinePage() {
                           className={cn(
                             "flex shrink-0 items-center justify-center border-r border-border/60 text-muted-foreground",
                             isWeekend && "bg-muted/40",
-                            isToday && "bg-primary/10 font-medium text-foreground",
+                            isToday &&
+                              "bg-primary/10 font-medium text-foreground",
                           )}
                           style={{ width: DAY_WIDTH }}
                         >
@@ -434,8 +531,14 @@ export default function TimelinePage() {
               {/* Body: satu kontainer scroll vertikal buat label & grid bareng,
                   biar baris nama project selalu lurus sama bar-nya. Horizontal
                   scroll cuma di panel grid (kanan). */}
-              <div className="flex min-h-0 flex-1 overflow-y-auto">
-                <div className="shrink-0 border-r border-border" style={{ width: LABEL_WIDTH }}>
+              <div
+                ref={bodyRef}
+                className="flex min-h-0 flex-1 overflow-y-auto scrollbar-hidden"
+              >
+                <div
+                  className="shrink-0 border-r border-border"
+                  style={{ width: LABEL_WIDTH, height: bodyHeight }}
+                >
                   {rows.map((row) => (
                     <div
                       key={row.key}
@@ -446,17 +549,22 @@ export default function TimelinePage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => toggleExpandedProject(row.project.id)}
+                            onClick={() =>
+                              toggleExpandedProject(row.project.id)
+                            }
                             disabled={!row.hasTasks}
                             aria-label={
-                              expandedProjects.has(row.project.id) ? "Tutup epic" : "Buka epic"
+                              expandedProjects.has(row.project.id)
+                                ? "Tutup epic"
+                                : "Buka epic"
                             }
                             className="flex h-full w-6 shrink-0 items-center justify-center text-muted-foreground disabled:opacity-0"
                           >
                             <CaretDown
                               className={cn(
                                 "size-3 transition-transform",
-                                !expandedProjects.has(row.project.id) && "-rotate-90",
+                                !expandedProjects.has(row.project.id) &&
+                                  "-rotate-90",
                               )}
                             />
                           </button>
@@ -470,7 +578,9 @@ export default function TimelinePage() {
                               name={row.project.user?.name}
                               size="xs"
                             />
-                            <span className="min-w-0 flex-1 truncate">{row.project.name}</span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {row.project.name}
+                            </span>
                           </button>
                         </>
                       )}
@@ -480,7 +590,11 @@ export default function TimelinePage() {
                             type="button"
                             onClick={() => toggleExpandedEpic(row.epic.id)}
                             disabled={!row.hasTasks}
-                            aria-label={expandedEpics.has(row.epic.id) ? "Tutup task" : "Buka task"}
+                            aria-label={
+                              expandedEpics.has(row.epic.id)
+                                ? "Tutup task"
+                                : "Buka task"
+                            }
                             className="flex h-full w-6 shrink-0 items-center justify-center pl-2 text-muted-foreground disabled:opacity-0"
                           >
                             <CaretDown
@@ -495,9 +609,17 @@ export default function TimelinePage() {
                             onClick={() => openRowDetail(row)}
                             className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left"
                           >
-                            <AssigneeAvatar id={row.epic.user?.id} name={row.epic.user?.name} size="xs" />
-                            <CodeBadge className="shrink-0">{row.epic.code}</CodeBadge>
-                            <span className="min-w-0 flex-1 truncate">{row.epic.name}</span>
+                            <AssigneeAvatar
+                              id={row.epic.user?.id}
+                              name={row.epic.user?.name}
+                              size="xs"
+                            />
+                            <CodeBadge className="shrink-0">
+                              {row.epic.code}
+                            </CodeBadge>
+                            <span className="min-w-0 flex-1 truncate">
+                              {row.epic.name}
+                            </span>
                           </button>
                         </>
                       )}
@@ -507,8 +629,13 @@ export default function TimelinePage() {
                           onClick={() => openRowDetail(row)}
                           className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 pl-14 text-left"
                         >
-                          <AssigneeAvatarGroup assignees={row.task.assignees} size="xs" />
-                          <CodeBadge className="shrink-0">{row.task.code}</CodeBadge>
+                          <AssigneeAvatarGroup
+                            assignees={row.task.assignees}
+                            size="xs"
+                          />
+                          <CodeBadge className="shrink-0">
+                            {row.task.code}
+                          </CodeBadge>
                           <span className="min-w-0 flex-1 truncate text-muted-foreground">
                             {row.task.name}
                           </span>
@@ -518,8 +645,15 @@ export default function TimelinePage() {
                   ))}
                 </div>
 
-                <div className="flex-1 overflow-x-auto" onScroll={handleBodyScroll}>
-                  <div className="relative" style={{ width: gridWidth, height: bodyHeight }}>
+                <div
+                  className="scrollbar-hidden flex-1 overflow-x-auto"
+                  onScroll={handleBodyScroll}
+                  onWheel={handleGridWheel}
+                >
+                  <div
+                    className="relative"
+                    style={{ width: gridWidth, height: bodyHeight }}
+                  >
                     {/* garis background per hari (weekend/hari ini) */}
                     <div className="absolute inset-0 flex">
                       {days.map((d, i) => {
@@ -561,7 +695,10 @@ export default function TimelinePage() {
                             "absolute flex cursor-pointer items-center",
                             row.type === "task"
                               ? cn("h-4", STATUS_DOT[row.task.status])
-                              : cn("h-5", row.overdue ? "bg-destructive" : "bg-primary"),
+                              : cn(
+                                  "h-5",
+                                  row.overdue ? "bg-destructive" : "bg-primary",
+                                ),
                             !row.clippedLeft && "rounded-l-sm",
                             !row.clippedRight && "rounded-r-sm",
                           )}
@@ -569,7 +706,9 @@ export default function TimelinePage() {
                             left: row.offset * DAY_WIDTH + 2,
                             width: row.duration * DAY_WIDTH - 4,
                             top:
-                              i * ROW_HEIGHT + (ROW_HEIGHT - (row.type === "task" ? 16 : 20)) / 2,
+                              i * ROW_HEIGHT +
+                              (ROW_HEIGHT - (row.type === "task" ? 16 : 20)) /
+                                2,
                           }}
                         >
                           <span className="truncate px-1.5 text-[10px] leading-none font-medium text-white">

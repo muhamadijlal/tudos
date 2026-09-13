@@ -2,6 +2,14 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.2] - 2026-09-14
+
+### Fixed
+- Bar Epic di Timeline kadang nyangkut di kolom paling kiri walau udah digeser ke periode yang gak overlap sama rentang tanggal Epic-nya — sekarang bar cuma digambar kalau beneran overlap sama periode yang lagi ditampilin.
+- Grid (garis background weekend/hari-ini) di Timeline sekarang selalu ngisi sampe bawah panel, gak berhenti pas-pasan ngikutin jumlah baris doang.
+- Baris paling bawah di Timeline (kalau project/epic-nya punya banyak task sampai perlu di-scroll) sempet ke-clip total (grid & bar-nya gak digambar sama sekali) — direstruktur jadi 1 kontainer scroll (bukan 2 bersarang) buat ngilangin bug ini.
+- Scrollbar horizontal panel grid Timeline disembunyiin (tetap bisa di-scroll pakai mouse wheel biasa).
+
 ## [2.0.0-beta.1] - 2026-09-14
 
 ### Changed (breaking)
@@ -17,6 +25,7 @@ Semua perubahan penting pada Tudos dicatat di file ini.
 - Timeline sekarang 3 level (Project -> Epic -> Task) — baris Project & Epic tetap tampil sebagai baris grup meski gak punya tanggal.
 - Epic sekarang punya warna sendiri (di-assign otomatis, bisa diganti manual) — tampil sebagai chip berwarna di kartu Kanban dan kolom Epic di Tudos, biar gampang bedain task dari epic mana secara visual sekilas (ala label Epic di Jira).
 - Halaman baru **Management Epic** — list flat semua epic lintas project (filter Project & kepemilikan, pencarian, export), buat/ubah/hapus epic dari satu tempat tanpa harus masuk ke tiap halaman detail project. Permission baru `menu.epicsManage` (otomatis kebuka buat role yang udah punya `menu.projectsManage`).
+- Epic sekarang punya `Tanggal Mulai` juga (ala Jira), gak cuma Due Date — jadi beneran punya rentang tanggal, bukan cuma 1 titik. Sama kayak Jira, gak ada validasi yang ngunci tanggal task-nya harus masuk rentang Epic itu — cuma buat perencanaan tingkat tinggi.
 
 ## [1.0.0] - 2026-09-14
 

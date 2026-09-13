@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useBreadcrumb } from "@/context/BreadcrumbContext";
 import { api, ApiError } from "@/lib/api";
+import { epicPeriodLabel } from "@/lib/epic";
 import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import {
   formatDate,
@@ -185,8 +186,8 @@ export default function EpicDetailPage() {
                     </div>
                   </Field>
 
-                  <Field label="Due Date">
-                    <p>{epic.dueDate ? formatDate(epic.dueDate) : "Tanpa due date"}</p>
+                  <Field label="Periode">
+                    <p>{epicPeriodLabel(epic)}</p>
                   </Field>
 
                   <Field label="Dibuat Pada">

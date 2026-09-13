@@ -157,6 +157,10 @@ model Epic {
   // round-robin pas epic dibuat, dipakai buat chip/badge epic di Kanban &
   // Tudos biar gampang bedain task dari epic mana secara visual (ala Jira).
   color       String    @default("blue") @db.VarChar(20)
+  // Ala Jira: Epic beneran punya rentang (start+due), bukan cuma 1 titik
+  // tanggal — tapi TETAP gak ada validasi yang ngunci task-nya harus masuk
+  // rentang ini (sama kayak Jira, cuma buat perencanaan tingkat tinggi).
+  startDate   DateTime? @map("start_date") @db.Timestamp(0)
   dueDate     DateTime? @map("due_date") @db.Timestamp(0)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)

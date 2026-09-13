@@ -27,6 +27,7 @@ import { useBreadcrumb } from "@/context/BreadcrumbContext";
 import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
 import { baseEpicCode } from "@/lib/epicCode";
 import { EPIC_COLOR_DOT, EPIC_COLOR_OPTIONS } from "@/lib/epicColor";
+import { epicPeriodLabel } from "@/lib/epic";
 import {
   formatDate,
   priorityLabel,
@@ -43,7 +44,14 @@ import { useNavigate, useParams } from "react-router-dom";
 const RELATED_TASKS_LIMIT = 5;
 const NOTES_PREVIEW_LIMIT = 5;
 
-const EMPTY_EPIC_FORM = { name: "", description: "", dueDate: "", userId: "", color: "" };
+const EMPTY_EPIC_FORM = {
+  name: "",
+  description: "",
+  startDate: "",
+  dueDate: "",
+  userId: "",
+  color: "",
+};
 
 function Field({ label, children }) {
   return (
@@ -150,6 +158,7 @@ export default function ProjectDetailPage() {
     setEpicForm({
       name: epic.name,
       description: epic.description ?? "",
+      startDate: epic.startDate ? epic.startDate.slice(0, 10) : "",
       dueDate: epic.dueDate ? epic.dueDate.slice(0, 10) : "",
       userId: epic.user?.id ? String(epic.user.id) : "",
       color: epic.color,
@@ -171,6 +180,7 @@ export default function ProjectDetailPage() {
     const payload = {
       name: epicForm.name,
       description: epicForm.description,
+      startDate: epicForm.startDate || null,
       dueDate: epicForm.dueDate || null,
       userId: epicForm.userId ? Number(epicForm.userId) : null,
       // Warna cuma dikirim pas edit — pas create selalu di-assign otomatis
@@ -274,7 +284,7 @@ export default function ProjectDetailPage() {
                             </button>
                             <EpicProgressBar progress={epic.progress} />
                             <span className="shrink-0 text-muted-foreground">
-                              {epic.dueDate ? formatDate(epic.dueDate) : "Tanpa due date"}
+                              {epicPeriodLabel(epic)}
                             </span>
                             {isProjectOwner && (
                               <div className="flex shrink-0 items-center gap-1">
@@ -448,13 +458,23 @@ export default function ProjectDetailPage() {
                 onChange={(e) => setEpicForm((prev) => ({ ...prev, description: e.target.value }))}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Due Date</Label>
-              <DatePicker
-                value={epicForm.dueDate}
-                onChange={(value) => setEpicForm((prev) => ({ ...prev, dueDate: value }))}
-                placeholder="Tanpa due date"
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label>Tanggal Mulai</Label>
+                <DatePicker
+                  value={epicForm.startDate}
+                  onChange={(value) => setEpicForm((prev) => ({ ...prev, startDate: value }))}
+                  placeholder="Tanpa tanggal mulai"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Due Date</Label>
+                <DatePicker
+                  value={epicForm.dueDate}
+                  onChange={(value) => setEpicForm((prev) => ({ ...prev, dueDate: value }))}
+                  placeholder="Tanpa due date"
+                />
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Owner</Label>

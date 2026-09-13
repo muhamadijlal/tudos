@@ -37,6 +37,7 @@ const epicResource = (epic) => ({
   name: epic.name,
   color: epic.color,
   description: epic.description ?? null,
+  startDate: epic.startDate ?? null,
   dueDate: epic.dueDate ?? null,
   user: epic.user ? userResource(epic.user) : null,
   progress: epicProgress(epic.tasks ?? []),

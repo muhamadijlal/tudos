@@ -157,3 +157,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
 }
+
+/* Scrollbar disembunyiin total (tapi tetep bisa di-scroll) — dipakai buat
+   panel grid Timeline, yang sengaja dibuat bisa di-scroll pakai scroll
+   wheel biasa (lihat handleGridWheel di TimelinePage.jsx), jadi gak butuh
+   scrollbar visual buat drag manual.
+*/
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
