@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment secrets (isi .env.example buat template-nya)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+dist-ssr/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# File yang diupload user (task attachment, foto profil) — dibuat ulang
+# otomatis sama app pas jalan (fs.mkdirSync recursive), gak perlu di-commit.
+backend/storage/
+
+# Claude Code session state (lokal per-mesin, bukan bagian dari app)
+.claude/
+
+# OS / editor
+.DS_Store
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

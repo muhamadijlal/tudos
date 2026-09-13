@@ -1,0 +1,74 @@
+[x] - dashboard page summary analytic per bulan, tambahkan filter periode project start and date, assignee;
+[x] - heatmap 1 tahun tampilkan pakai react heatmap, untuk pembagian nilainya itu ada 5 segment, 1 - 5, 6 - 10, 10 - 15, 16-20, 21 - setersunya.
+[x] - project Ketika diclick itemnya akan muncul detail popup dialog ada dua kolom, kolom sebelah kiri akan ada judul, deskripsi, attachment, task terkait tapi delimit, ada link detail untuk menuju ke tudos dengan filter project tersebut. lalu kolom sebelah kanan detail ke created_at, assignee, due date project kapan, siapa yang buat.
+[x] - menu tudos buat pagination, menggunakan query tanstack table.
+[x] - gimana cara membuat, agar data yang ditampilkan dikanban itu bisa mencakup semua task. kalau misalkan ada 100 task dengan status berbeda beda apakah perlu dimunculkan semua ? aku serahkan padamu.
+[x] - role admin untuk data tidak dibatasi, member hanya task yang assign ke dia yang ditampilkan.
+[x] - pastikan tampilan responsive (mobile, tablet, desktop, large desktop).
+
+--- Catatan dari Claude (semua item 1-7 selesai, dites via curl + Playwright di 4 breakpoint, build & lint bersih) ---
+
+1. Dashboard: filter Project/Assignee/Periode (tanggal), stat card total per status,
+   chart bulanan (recharts, stacked per status), semuanya dihitung client-side dari
+   /tasks & /projects yang sudah role-scoped. Default periode = 6 bulan terakhir kalau
+   filter tanggal dikosongin.
+
+2. Heatmap: pakai @uiw/react-heat-map, 1 tahun rolling, 5 segmen warna (1-5, 6-10,
+   11-15, 16-20, 21+) pakai gradasi warna primary (ungu) app ini. Hitungannya dari
+   task yang DIBUAT per hari (createdAt), gak kepengaruh filter periode (heatmap-nya
+   emang selalu 1 tahun penuh), tapi tetep ngikut filter Project/Assignee.
+   BUG YANG KETEMU & DIPERBAIKI: task.resource.js ternyata gak pernah nge-expose
+   `createdAt` ke frontend sama sekali (dari awal, bukan cuma buat fitur ini) — jadi
+   sebelum fix ini, chart bulanan & heatmap selalu kosong. Udah ditambahin.
+
+3. Project detail dialog: klik card di halaman "Project" → dialog 2 kolom. Kiri:
+   deskripsi, 5 task terkait pertama (+sisanya dihitung, ada indikator attachment
+   kalau ada lampiran), tombol "Lihat Semua di Tudos" (redirect ke /tudos?projectId=X,
+   otomatis clear filter due-date biar semua task project itu kelihatan). Kanan:
+   dibuat pada, dibuat oleh, due date.
+   CATATAN INTERPRETASI: request aslinya nyebut "assignee" DAN "siapa yang buat"
+   sebagai 2 hal terpisah di kolom kanan, tapi model Project cuma punya 1 relasi user
+   (pemilik/pembuat) — jadi digabung jadi 1 field "Dibuat Oleh". Kalau maksudnya beda
+   (misal mau nampilin siapa aja yang punya task di project itu), bilang aja nanti
+   saya tambahin.
+   Project sekarang punya field baru `dueDate` (migration baru), bisa diisi/dihapus
+   lewat form di Management Project.
+
+4. Tudos pagination: pakai @tanstack/react-table (v8.21.3 — sempat kepasang v9 by
+   default dari npm install, ternyata API-nya beda total & belum matang, jadi di-pin
+   ke v8 yang stabil). 10 baris per halaman, tombol Previous/Next.
+
+5. Kanban: kartu di-render maks 20 per kolom awalnya, sisanya nongol lewat tombol
+   "Muat Lebih Banyak" per kolom (nambah 20 tiap diklik). Diputuskan gak pakai
+   virtualisasi (react-window dll) karena drag-and-drop native yang udah ada bisa
+   jadi lebih ribet & rawan bug kalau kartu di luar viewport ikut ke-unmount.
+
+6. Role visibility: ini udah selesai dari sesi sebelumnya, saya cek ulang masih jalan
+   normal (member cuma lihat task/project yang di-assign ke dia, admin full).
+
+7. Responsive: dicek di 375px (mobile), 768px (tablet), 1280px (desktop), 1920px
+   (large desktop) — sidebar-nya emang udah otomatis jadi drawer/sheet di mobile
+   (bawaan komponen sidebar shadcn-nya, gak perlu diubah). Yang saya perbaiki:
+   - Tabel User Management, Management Project: kolom yang kurang penting
+     (Email, Deskripsi, Pemilik) disembunyiin di layar sempit, kolom Aksi & data
+     utama tetep selalu kelihatan tanpa perlu scroll horizontal.
+   - Tabel Tudos (TanStack): kolom Project/Kategori/Prioritas/Due Date nyembunyi
+     bertahap sesuai breakpoint, yang tetep muncul di mobile: Task, Assignee,
+     Status, Aksi.
+   - TaskFormDialog: grid 2 & 3 kolom (Project/Assignee, Kategori/Prioritas/Status)
+     tadinya gak collapse ke 1 kolom di mobile — sekarang udah.
+   - Role combobox di User Management dipersempit dikit di mobile biar tombol
+     "Hapus"-nya gak kepotong.
+   Yang udah oke dari awal (gak perlu diubah): grid kartu Project & Kanban, stat
+   card Dashboard, ProjectDetailDialog (2 kolom → 1 kolom di mobile), kalender
+   date-range picker (react-day-picker-nya udah otomatis nyesuain lebar layar).
+
+Lain-lain yang ikut kesentuh/kefix pas ngerjain ini:
+- Bug lama: soft-deleted task masih ikut kehitung di project.tasks.length & di cek
+  "project masih ada task terkait" pas mau hapus project — sekarang udah difilter
+  deletedAt-nya.
+- Vite dev server sempat stuck gara-gara cache dependency lama abis install package
+  baru (tanstack-table, recharts, react-heat-map) — saya restart dev server-nya biar
+  pickup dependency baru.
+- Semua data test yang saya buat buat verifikasi (task/project dummy) udah saya
+  hapus lagi di akhir.

@@ -1,0 +1,54 @@
+{
+  "name": "tudos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --experimental-test-module-mocks --test",
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
+    "key:jwt:generate": "node src/scripts/generate_jwt_secret.js",
+    "user:make-admin": "node src/scripts/make_admin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*",
+    "#config/*": "./src/config/*",
+    "#controllers/*": "./src/controllers/*",
+    "#middleware/*": "./src/middleware/*",
+    "#prisma/*": "./src/prisma/*",
+    "#resources/*": "./src/resources/*",
+    "#routes/*": "./src/routes/*",
+    "#scripts/*": "./src/scripts/*",
+    "#services/*": "./src/services/*",
+    "#utils/*": "./src/utils/*",
+    "#validations/*": "./src/validations/*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.39.5",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^17.12.0",
+    "nodemon": "^3.1.14",
+    "prisma": "^7.10.0"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.0",
+    "multer": "^2.3.0",
+    "pdfmake": "^0.3.11",
+    "sharp": "^0.35.4",
+    "zod": "^4.5.4"
+  }
+}

@@ -1,0 +1,20 @@
+import { Skeleton } from "@/components/ui/skeleton";
+import { TableCell, TableRow } from "@/components/ui/table";
+
+// Baris placeholder buat nunjukin animasi loading di dalam <Table> yang
+// sama, biar header kolom gak ikut hilang-muncul pas data lagi dimuat.
+export function TableSkeletonRows({ columns, rows = 5 }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <TableRow key={rowIndex}>
+          {Array.from({ length: columns }).map((_, colIndex) => (
+            <TableCell key={colIndex}>
+              <Skeleton className="h-4 w-full max-w-32" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
