@@ -1,5 +1,6 @@
 import prisma from "#prisma/client.js";
 import ApiError from "#utils/ApiError.js";
+import { SYSTEM_ROLES } from "#utils/system-roles.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import fs from "fs/promises";
@@ -47,9 +48,12 @@ async function saveProfilePictureBuffer(buffer) {
 // permission users.view), karena assign task ke orang lain sekarang bisa
 // dilakuin siapa aja yang jadi owner project-nya, bukan cuma yang punya
 // users.view.
-export function findAllMinimal() {
+export function findAllMinimal({ excludeAdmins = false } = {}) {
   return prisma.user.findMany({
-    where: { deletedAt: null },
+    where: {
+      deletedAt: null,
+      ...(excludeAdmins ? { role: { name: { not: SYSTEM_ROLES.ADMIN } } } : {}),
+    },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

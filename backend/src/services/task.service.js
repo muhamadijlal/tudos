@@ -1,5 +1,6 @@
 import prisma from "#prisma/client.js";
 import ApiError from "#utils/ApiError.js";
+import { SYSTEM_ROLES } from "#utils/system-roles.js";
 import fs from "fs/promises";
 import path from "path";
 
@@ -85,9 +86,23 @@ export function findPendingReview(ownerId) {
 async function assertUsersExist(userIds) {
   const users = await prisma.user.findMany({
     where: { id: { in: userIds }, deletedAt: null },
+    include: { role: true },
   });
 
   if (users.length !== userIds.length) throw new ApiError(404, "user not found");
+  return users;
+}
+
+// Selain Admin, siapa pun (termasuk yang punya tasks.assignOthers atau owner
+// project) gak boleh assign task ke user dengan role Admin — biar Admin gak
+// kebanjiran task dari member yang gak berwenang nugasin admin.
+function assertCanAssignToAdmin(requester, targetUsers) {
+  if (requester.role?.name === SYSTEM_ROLES.ADMIN) return;
+
+  const targetsAdmin = targetUsers.some((u) => u.role?.name === SYSTEM_ROLES.ADMIN);
+  if (targetsAdmin) {
+    throw new ApiError(403, "Kamu tidak bisa assign task ke user dengan role Admin");
+  }
 }
 
 // User dengan permission tasks.assignOthers bebas assign ke siapa aja (bisa
@@ -204,8 +219,9 @@ export async function create(data, files = [], requester) {
 
   if (!epic) throw new ApiError(404, "epic not found");
   if (!category) throw new ApiError(404, "category not found");
-  await assertUsersExist(userIds);
+  const targetUsers = await assertUsersExist(userIds);
   assertCanAssign(requester, userIds, epic.project.userId);
+  assertCanAssignToAdmin(requester, targetUsers);
 
   // Nomor urut task ala Jira (epic.code + sequence, mis. "WEB-12") — counter
   // di epic di-increment atomik biar gak ada nomor bentrok kalau dua task
@@ -249,7 +265,7 @@ export async function update(taskId, data, files = [], requester) {
 
   if (data.epicId && !epic) throw new ApiError(404, "epic not found");
   if (data.categoryId && !category) throw new ApiError(404, "category not found");
-  if (data.userIds) await assertUsersExist(data.userIds);
+  const targetUsers = data.userIds ? await assertUsersExist(data.userIds) : null;
 
   // `epic` udah ke-fetch di atas kalau caller ngirim epicId (form edit
   // selalu ngirim ini) — cuma perlu fetch ekstra buat kasus Kanban
@@ -265,6 +281,7 @@ export async function update(taskId, data, files = [], requester) {
 
   if (data.userIds) {
     assertCanAssign(requester, data.userIds, owningEpic.project.userId);
+    assertCanAssignToAdmin(requester, targetUsers);
   }
 
   if (statusChanging) {

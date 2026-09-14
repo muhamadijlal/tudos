@@ -2,6 +2,12 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.5] - 2026-09-14
+
+### Changed
+- Role selain Admin sekarang gak bisa assign task ke user dengan role Admin sama sekali — dicek di server (`task.service.js`, berlaku juga buat owner project/pemegang `tasks.assignOthers`) dan user Admin juga otomatis gak muncul di daftar assignee (`GET /users/assignable`) buat requester non-Admin.
+- Semua modal (dialog & alert-dialog) sekarang dibatasin tinggi maksimalnya ke layar (`max-h-[calc(100%-2rem)]`) dan bisa di-scroll kalau isinya kepanjangan — sebelumnya modal yang kontennya banyak bisa meluber keluar layar tanpa cara buat lihat sisanya.
+
 ## [2.0.0-beta.4] - 2026-09-14
 
 ### Changed

@@ -1,11 +1,16 @@
 import { userCollection, userResource } from "#resources/user.resource.js";
 import * as userService from "#services/user.service.js";
 import ApiError from "#utils/ApiError.js";
+import { SYSTEM_ROLES } from "#utils/system-roles.js";
 import path from "path";
 
 const getAssignableUsers = async (req, res, next) => {
   try {
-    const users = await userService.findAllMinimal();
+    // Selain Admin gak boleh liat/assign ke user dengan role Admin (lihat
+    // task.service.js#assertCanAssignToAdmin — ini cuma nyembunyiin dari
+    // daftar, enforcement beneran tetap di service pas create/update task).
+    const excludeAdmins = req.user.role?.name !== SYSTEM_ROLES.ADMIN;
+    const users = await userService.findAllMinimal({ excludeAdmins });
 
     res.status(200).json({
       success: true,
