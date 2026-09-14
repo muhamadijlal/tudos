@@ -1,3 +1,4 @@
+import { AssigneeAvatar } from "@/components/AssigneeAvatar";
 import { CodeBadge } from "@/components/CodeBadge";
 import { Combobox } from "@/components/Combobox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -113,14 +114,15 @@ export default function EpicManagementPage() {
   const projectOptions = ownedProjects.map((p) => ({ value: String(p.id), label: p.name }));
   const userOptions = [
     { value: "", label: "Tanpa owner" },
-    ...users.map((u) => ({ value: String(u.id), label: u.name })),
+    ...users.map((u) => ({ value: String(u.id), label: u.fullName || u.name })),
   ];
 
   function renderOwnerOption(option) {
     if (option.value === "") return option.label;
     const isSelf = String(option.value) === String(user?.id);
     return (
-      <span>
+      <span className="flex items-center gap-2">
+        <AssigneeAvatar id={option.value} name={option.label} size="xs" />
         {option.label}
         {isSelf && " (Kamu)"}
       </span>
@@ -504,8 +506,9 @@ export default function EpicManagementPage() {
                   renderValue={renderOwnerOption}
                 />
               ) : (
-                <p className="flex h-8 items-center text-xs text-muted-foreground">
-                  {user?.name} (Kamu)
+                <p className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
+                  <AssigneeAvatar id={user?.id} name={user?.fullName || user?.name} size="xs" />
+                  {user?.fullName || user?.name} (Kamu)
                 </p>
               )}
             </div>
