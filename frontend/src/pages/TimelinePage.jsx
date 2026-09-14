@@ -209,6 +209,12 @@ export default function TimelinePage() {
     try {
       const res = await api.get("/projects");
       setProjects(res.data);
+      // Default semua Project & Epic dalam keadaan expanded (bukan collapsed
+      // kayak sebelumnya) — task ngikut tampil otomatis begitu epic-nya
+      // expanded, gak punya toggle sendiri. User masih bisa collapse manual
+      // lewat caret kalau mau.
+      setExpandedProjects(new Set(res.data.map((p) => p.id)));
+      setExpandedEpics(new Set(res.data.flatMap((p) => (p.epics ?? []).map((e) => e.id))));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Gagal memuat project");
     } finally {
