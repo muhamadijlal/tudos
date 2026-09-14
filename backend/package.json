@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node --experimental-test-module-mocks --test",
-    "dev": "nodemon server.js",
+    "dev": "node --import=dotenv/config --watch server.js",
     "lint": "eslint .",
     "key:jwt:generate": "node src/scripts/generate_jwt_secret.js",
     "user:make-admin": "node src/scripts/make_admin.js"
