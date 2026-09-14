@@ -1,32 +1,16 @@
 import { AssigneeAvatar } from "@/components/AssigneeAvatar";
 import { AssigneeAvatarGroup } from "@/components/AssigneeAvatarGroup";
 import { CodeBadge } from "@/components/CodeBadge";
-import { Combobox } from "@/components/Combobox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DatePicker } from "@/components/DatePicker";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
-import { FormRequiredNote, RequiredMark } from "@/components/RequiredMark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useBreadcrumb } from "@/context/BreadcrumbContext";
-import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
-import { baseEpicCode } from "@/lib/epicCode";
-import { EPIC_COLOR_DOT, EPIC_COLOR_OPTIONS } from "@/lib/epicColor";
+import { api, ApiError } from "@/lib/api";
+import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import { epicPeriodLabel } from "@/lib/epic";
 import {
   formatDate,
@@ -36,22 +20,12 @@ import {
   statusLabel,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
-import { collectErrors, validateRequired } from "@/lib/validation";
-import { NotePencil, Paperclip, Plus } from "@phosphor-icons/react";
+import { NotePencil, Paperclip } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const RELATED_TASKS_LIMIT = 5;
 const NOTES_PREVIEW_LIMIT = 5;
-
-const EMPTY_EPIC_FORM = {
-  name: "",
-  description: "",
-  startDate: "",
-  dueDate: "",
-  userId: "",
-  color: "",
-};
 
 function Field({ label, children }) {
   return (
@@ -86,15 +60,9 @@ export default function ProjectDetailPage() {
   const { user: currentUser } = useAuth();
   const [project, setProject] = useState(null);
   const [notes, setNotes] = useState([]);
-  const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [epicFormOpen, setEpicFormOpen] = useState(false);
-  const [editingEpic, setEditingEpic] = useState(null);
-  const [epicForm, setEpicForm] = useState(EMPTY_EPIC_FORM);
-  const [epicFieldErrors, setEpicFieldErrors] = useState({});
-  const [isSubmittingEpic, setIsSubmittingEpic] = useState(false);
   const [epicDeleteTarget, setEpicDeleteTarget] = useState(null);
   const [feedback, setFeedback] = useState({ open: false, variant: "error", title: "", description: "" });
 
@@ -109,13 +77,11 @@ export default function ProjectDetailPage() {
     Promise.all([
       api.get(`/projects/${projectId}`),
       api.get(`/projects/${projectId}/notes`),
-      api.get("/users/assignable"),
     ])
-      .then(([projectRes, notesRes, usersRes]) => {
+      .then(([projectRes, notesRes]) => {
         if (cancelled) return;
         setProject(projectRes.data);
         setNotes(notesRes.data);
-        setUsers(usersRes.data);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Gagal memuat detail project.");
@@ -136,79 +102,11 @@ export default function ProjectDetailPage() {
   const remainingNotesCount = notes.length - notesPreview.length;
 
   const isProjectOwner = project?.user?.id === currentUser?.id;
-  const userOptions = [
-    { value: "", label: "Tanpa owner" },
-    ...users.map((u) => ({ value: String(u.id), label: u.name })),
-  ];
 
   useBreadcrumb([
     { label: "Project", to: "/projects" },
     { label: isLoading ? "..." : (project?.name ?? "Project") },
   ]);
-
-  function openCreateEpicForm() {
-    setEditingEpic(null);
-    setEpicForm(EMPTY_EPIC_FORM);
-    setEpicFieldErrors({});
-    setEpicFormOpen(true);
-  }
-
-  function openEditEpicForm(epic) {
-    setEditingEpic(epic);
-    setEpicForm({
-      name: epic.name,
-      description: epic.description ?? "",
-      startDate: epic.startDate ? epic.startDate.slice(0, 10) : "",
-      dueDate: epic.dueDate ? epic.dueDate.slice(0, 10) : "",
-      userId: epic.user?.id ? String(epic.user.id) : "",
-      color: epic.color,
-    });
-    setEpicFieldErrors({});
-    setEpicFormOpen(true);
-  }
-
-  function validateEpic() {
-    return collectErrors({ name: validateRequired(epicForm.name, "Nama epic") });
-  }
-
-  async function handleEpicSubmit(e) {
-    e.preventDefault();
-    const errors = validateEpic();
-    setEpicFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-
-    const payload = {
-      name: epicForm.name,
-      description: epicForm.description,
-      startDate: epicForm.startDate || null,
-      dueDate: epicForm.dueDate || null,
-      userId: epicForm.userId ? Number(epicForm.userId) : null,
-      // Warna cuma dikirim pas edit — pas create selalu di-assign otomatis
-      // round-robin di server (lihat epic.service.js#create).
-      ...(editingEpic ? { color: epicForm.color } : {}),
-    };
-
-    setIsSubmittingEpic(true);
-    try {
-      if (editingEpic) {
-        await api.put(`/epics/${editingEpic.id}`, payload);
-      } else {
-        await api.post(`/projects/${projectId}/epics`, payload);
-      }
-      setEpicFormOpen(false);
-      await loadProject();
-    } catch (err) {
-      if (err instanceof ApiError && err.errors) setEpicFieldErrors(normalizeFieldErrors(err.errors));
-      setFeedback({
-        open: true,
-        variant: "error",
-        title: editingEpic ? "Gagal mengubah epic" : "Gagal membuat epic",
-        description: err instanceof ApiError ? err.message : "Terjadi kesalahan tak terduga.",
-      });
-    } finally {
-      setIsSubmittingEpic(false);
-    }
-  }
 
   async function handleEpicDelete() {
     try {
@@ -290,14 +188,6 @@ export default function ProjectDetailPage() {
                               <div className="flex shrink-0 items-center gap-1">
                                 <Button
                                   type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditEpicForm(epic)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => setEpicDeleteTarget(epic)}
@@ -309,17 +199,6 @@ export default function ProjectDetailPage() {
                           </div>
                         ))}
                       </div>
-                    )}
-                    {isProjectOwner && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-fit"
-                        onClick={openCreateEpicForm}
-                      >
-                        <Plus /> Epic Baru
-                      </Button>
                     )}
                   </Field>
 
@@ -418,104 +297,6 @@ export default function ProjectDetailPage() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={epicFormOpen} onOpenChange={setEpicFormOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingEpic ? "Edit Epic" : "Epic Baru"}</DialogTitle>
-            <DialogDescription>
-              {editingEpic ? "Ubah detail epic ini." : "Isi detail epic yang mau dibuat."}
-            </DialogDescription>
-            <FormRequiredNote />
-          </DialogHeader>
-          <form onSubmit={handleEpicSubmit} noValidate className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="epic-name">
-                Nama
-                <RequiredMark />
-              </Label>
-              <Input
-                id="epic-name"
-                aria-invalid={Boolean(epicFieldErrors.name)}
-                value={epicForm.name}
-                onChange={(e) => setEpicForm((prev) => ({ ...prev, name: e.target.value }))}
-              />
-              {epicFieldErrors.name && (
-                <p className="text-xs text-destructive">{epicFieldErrors.name}</p>
-              )}
-              {!editingEpic && epicForm.name.trim() && (
-                <p className="flex items-center gap-1.5 text-muted-foreground">
-                  Preview kode: <CodeBadge>{baseEpicCode(epicForm.name)}</CodeBadge>
-                  <span>(bisa jadi {baseEpicCode(epicForm.name)}2, dst kalau kodenya udah kepake)</span>
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="epic-description">Deskripsi</Label>
-              <Textarea
-                id="epic-description"
-                value={epicForm.description}
-                onChange={(e) => setEpicForm((prev) => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label>Tanggal Mulai</Label>
-                <DatePicker
-                  value={epicForm.startDate}
-                  onChange={(value) => setEpicForm((prev) => ({ ...prev, startDate: value }))}
-                  placeholder="Tanpa tanggal mulai"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Due Date</Label>
-                <DatePicker
-                  value={epicForm.dueDate}
-                  onChange={(value) => setEpicForm((prev) => ({ ...prev, dueDate: value }))}
-                  placeholder="Tanpa due date"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Owner</Label>
-              <Combobox
-                options={userOptions}
-                value={epicForm.userId}
-                onValueChange={(value) => setEpicForm((prev) => ({ ...prev, userId: value }))}
-                placeholder="Tanpa owner"
-                searchPlaceholder="Cari user..."
-                emptyText="User tidak ditemukan."
-              />
-            </div>
-            {editingEpic && (
-              <div className="flex flex-col gap-1.5">
-                <Label>Warna</Label>
-                <div className="flex flex-wrap gap-2">
-                  {EPIC_COLOR_OPTIONS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setEpicForm((prev) => ({ ...prev, color }))}
-                      aria-label={color}
-                      className={cn(
-                        "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
-                        EPIC_COLOR_DOT[color],
-                        epicForm.color === color && "ring-2 ring-foreground",
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmittingEpic}>
-                {isSubmittingEpic && <Spinner />}
-                {isSubmittingEpic ? "Menyimpan..." : "Simpan"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <ConfirmDialog
         open={Boolean(epicDeleteTarget)}
