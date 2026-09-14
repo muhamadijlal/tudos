@@ -126,6 +126,11 @@ function TaskCard({ task, onDragStart, onClick }) {
 export default function KanbanPage() {
   const { user: currentUser } = useAuth();
   const canAssignOthers = hasPermission(currentUser, "tasks.assignOthers");
+  // Sama kayak TudosPage: yang gak bisa lihat semua task (gak punya
+  // tasks.viewAll) cuma pernah dikasih task-nya sendiri sama backend, jadi
+  // filter Assignee dikunci ke diri sendiri (disabled) — pilih orang lain di
+  // sini gak bakal pernah ngasilin apa-apa buat mereka.
+  const canViewAllTasks = hasPermission(currentUser, "tasks.viewAll");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Ditaruh di dalem komponen (bukan module-level) biar bisa nangkep
@@ -173,7 +178,7 @@ export default function KanbanPage() {
   );
   const [draftEpicFilter, setDraftEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(() =>
-    parseIdsParam(searchParams, "assignee"),
+    canViewAllTasks ? parseIdsParam(searchParams, "assignee") : [String(currentUser?.id ?? "")],
   );
   const [draftCategoryFilter, setDraftCategoryFilter] = useState(() =>
     parseIdsParam(searchParams, "category"),
@@ -188,7 +193,9 @@ export default function KanbanPage() {
   const [draftDueDateTo, setDraftDueDateTo] = useState(() => parseDateParam(searchParams, "dueTo"));
   const [projectFilter, setProjectFilter] = useState(() => parseIdsParam(searchParams, "project"));
   const [epicFilter, setEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
-  const [assigneeFilter, setAssigneeFilter] = useState(() => parseIdsParam(searchParams, "assignee"));
+  const [assigneeFilter, setAssigneeFilter] = useState(() =>
+    canViewAllTasks ? parseIdsParam(searchParams, "assignee") : [String(currentUser?.id ?? "")],
+  );
   const [categoryFilter, setCategoryFilter] = useState(() => parseIdsParam(searchParams, "category"));
   const [priorityFilter, setPriorityFilter] = useState(() => parseIdsParam(searchParams, "priority"));
   const [statusFilter, setStatusFilter] = useState(() => parseIdsParam(searchParams, "status"));
@@ -272,9 +279,10 @@ export default function KanbanPage() {
   }
 
   function resetFilters() {
+    const resetAssignee = canViewAllTasks ? [] : [String(currentUser?.id ?? "")];
     setDraftProjectFilter([]);
     setDraftEpicFilter([]);
-    setDraftAssigneeFilter([]);
+    setDraftAssigneeFilter(resetAssignee);
     setDraftCategoryFilter([]);
     setDraftPriorityFilter([]);
     setDraftStatusFilter([]);
@@ -282,7 +290,7 @@ export default function KanbanPage() {
     setDraftDueDateTo("");
     setProjectFilter([]);
     setEpicFilter([]);
-    setAssigneeFilter([]);
+    setAssigneeFilter(resetAssignee);
     setCategoryFilter([]);
     setPriorityFilter([]);
     setStatusFilter([]);
@@ -315,7 +323,9 @@ export default function KanbanPage() {
       ? epics.filter((e) => draftProjectFilter.includes(String(e.projectId)))
       : epics
   ).map((e) => ({ value: String(e.id), label: e.name, color: e.color }));
-  const assigneeFilterOptions = users.map((u) => ({ value: String(u.id), label: u.name }));
+  const assigneeFilterOptions = canViewAllTasks
+    ? users.map((u) => ({ value: String(u.id), label: u.name }))
+    : [{ value: String(currentUser?.id ?? ""), label: currentUser?.name ?? "Kamu" }];
   const categoryFilterOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
   const priorityFilterOptions = PRIORITY_OPTIONS.map((p) => ({ value: p.value, label: p.label }));
   const statusFilterOptions = STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }));
@@ -503,6 +513,7 @@ export default function KanbanPage() {
                 searchPlaceholder="Cari assignee..."
                 renderOption={renderAssigneeOption}
                 renderValue={renderAssigneeOption}
+                disabled={!canViewAllTasks}
                 size="sm"
                 className="w-40"
               />
