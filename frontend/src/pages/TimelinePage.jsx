@@ -136,6 +136,7 @@ export default function TimelinePage() {
   });
   const headerScrollRef = useRef(null);
   const bodyRef = useRef(null);
+  const gridScrollRef = useRef(null);
   // Tinggi kontainer body yang beneran kelihatan (viewport) — dipakai biar
   // grid (garis weekend/hari-ini) tetap ngisi sampe bawah walau row-nya
   // dikit (gak nyisain area putih kosong tanpa grid).
@@ -175,6 +176,17 @@ export default function TimelinePage() {
     e.preventDefault();
     el.scrollLeft += e.deltaY;
   }
+
+  // React nempelin listener `onWheel` sebagai passive di root, jadi
+  // e.preventDefault() di dalemnya bakal ke-throw "Unable to preventDefault
+  // inside passive event listener invocation". Makanya listener-nya
+  // dipasang manual lewat addEventListener dengan { passive: false }.
+  useEffect(() => {
+    const el = gridScrollRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleGridWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleGridWheel);
+  }, [isLoading]);
 
   function applyFilters() {
     setOwnerFilter(draftOwnerFilter);
@@ -759,9 +771,9 @@ export default function TimelinePage() {
                 </div>
 
                 <div
+                  ref={gridScrollRef}
                   className="scrollbar-hidden flex-1 self-start overflow-x-auto overflow-y-hidden"
                   onScroll={handleBodyScroll}
-                  onWheel={handleGridWheel}
                 >
                   <div
                     className="relative"
