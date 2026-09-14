@@ -13,8 +13,20 @@ import taskCommentRoutes from "#routes/task-comment.routes.js";
 import taskRoutes from "#routes/task.routes.js";
 import userRoutes from "#routes/user.routes.js";
 import { Router } from "express";
+import fs from "fs";
 
 const router = Router();
+
+// Ngasih tau front-end/browser "backend ini nyala & bisa diakses" kalau
+// diakses langsung ("/", root API) — publik, gak perlu login.
+const pkg = JSON.parse(fs.readFileSync(new URL("../../package.json", import.meta.url)));
+router.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Tudos API is running",
+    data: { name: pkg.name, version: pkg.version, time: new Date().toISOString() },
+  });
+});
 
 router.use("/users", authenticate, userRoutes);
 // Publik (gak lewat authenticate) — <img src> gak bisa nempelin header

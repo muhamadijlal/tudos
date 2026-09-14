@@ -2,7 +2,7 @@ import prisma from "#prisma/client.js";
 
 // Kode pendek ala Jira, di-generate otomatis dari nama epic — 3
 // huruf/angka pertama (non-alfanumerik dibuang), fallback "EPC" kalau nama
-// kosong/isinya simbol semua. Sama persis pola projectCode.js.
+// kosong/isinya simbol semua.
 export function baseEpicCode(name) {
   const alnum = (name ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   const base = alnum.slice(0, 3) || "EPC";

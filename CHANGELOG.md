@@ -2,6 +2,14 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.3] - 2026-09-14
+
+### Added
+- `GET /` di backend sekarang balikin info status ("Tudos API is running" + nama/versi/waktu) — biar gampang ngecek backend-nya beneran nyala & bisa diakses.
+
+### Fixed
+- Error `The column projects.code does not exist` pas buka Dashboard — sisa kode mati dari sebelum migrasi Epic (`utils/projectCode.js` dan script `backfill_project_task_codes.js`, keduanya masih query kolom `Project.code` yang udah dihapus) dihapus total.
+
 ## [2.0.0-beta.2] - 2026-09-14
 
 ### Fixed
