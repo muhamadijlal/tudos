@@ -147,14 +147,14 @@ function assertCanSetStatus(status, projectOwnerId, assigneeIds, requester) {
 // Transisi yang wajib disertai catatan (disepakati bareng user), biar selalu
 // ada konteks kenapa perubahannya terjadi:
 // - In Review -> Todo/In Progress: "dikembalikan" (direject reviewer).
-// - In Progress -> In Review: "diajukan" buat direview (assignee ngejelasin
-//   apa yang udah dikerjain).
+// - Todo/In Progress -> In Review: "diajukan" buat direview (assignee
+//   ngejelasin apa yang udah dikerjain).
 // - Done -> Todo/In Progress: "dibuka lagi" (task yang udah kelar direvisi
 //   lagi, wajib dijelasin kenapa).
 // Transisi lain (termasuk In Review -> Done, approve) gak wajib.
 function requiresReviewNote(fromStatus, toStatus) {
   if (fromStatus === "in_review" && (toStatus === "todo" || toStatus === "in_progress")) return true;
-  if (fromStatus === "in_progress" && toStatus === "in_review") return true;
+  if ((fromStatus === "todo" || fromStatus === "in_progress") && toStatus === "in_review") return true;
   if (fromStatus === "done" && (toStatus === "todo" || toStatus === "in_progress")) return true;
   return false;
 }

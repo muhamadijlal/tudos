@@ -23,7 +23,7 @@ export function statusLabel(value) {
 // kapan perlu munculin ReviewNoteDialog sebelum ngirim PUT.
 export function requiresReviewNote(fromStatus, toStatus) {
   if (fromStatus === "in_review" && (toStatus === "todo" || toStatus === "in_progress")) return true;
-  if (fromStatus === "in_progress" && toStatus === "in_review") return true;
+  if ((fromStatus === "todo" || fromStatus === "in_progress") && toStatus === "in_review") return true;
   if (fromStatus === "done" && (toStatus === "todo" || toStatus === "in_progress")) return true;
   return false;
 }
@@ -43,7 +43,7 @@ export function describeStatusTransition(fromStatus, toStatus) {
   if (fromStatus === "in_review" && (toStatus === "todo" || toStatus === "in_progress")) {
     return "Dikembalikan dari";
   }
-  if (fromStatus === "in_progress" && toStatus === "in_review") {
+  if ((fromStatus === "todo" || fromStatus === "in_progress") && toStatus === "in_review") {
     return "Diajukan untuk review dari";
   }
   if (fromStatus === "done" && (toStatus === "todo" || toStatus === "in_progress")) {
