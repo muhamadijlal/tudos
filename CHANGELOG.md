@@ -2,6 +2,11 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.7] - 2026-09-14
+
+### Fixed
+- Scroll horizontal di Timeline (wheel biasa) sekarang gak lempar error "Unable to preventDefault inside passive event listener invocation" — listener wheel-nya dipasang manual (bukan lewat prop `onWheel` React yang passive by default).
+
 ## [2.0.0-beta.6] - 2026-09-14
 
 ### Added
