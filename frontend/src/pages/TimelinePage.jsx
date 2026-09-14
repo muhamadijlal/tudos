@@ -29,11 +29,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const RANGE_DAYS = 28;
-const DAY_WIDTH = 36;
 const ROW_HEIGHT = 40;
-const HEADER_HEIGHT = 40;
+// Header 2 baris ala Jira: baris atas nama bulan (span beberapa kolom hari),
+// baris bawah angka tanggal per hari (disembunyikan kalau kolomnya kesempitan
+// buat nampilin — lihat `showDayNumber` di ZOOM_LEVELS).
+const MONTH_ROW_HEIGHT = 22;
+const DAY_ROW_HEIGHT = 34;
+const HEADER_HEIGHT = MONTH_ROW_HEIGHT + DAY_ROW_HEIGHT;
 const LABEL_WIDTH = 260;
+
+// Level zoom ala Jira Timeline (Weeks/Months/Quarters) — ngubah lebar kolom
+// per hari + berapa hari ditampilin sekaligus, biar bisa "zoom out" buat
+// liat lebih jauh ke depan tanpa pindah halaman (Prev/Next) berkali-kali.
+// Model data & layout bar TETAP per-hari (dayIndex/layoutBar gak berubah,
+// satuan waktunya selalu 1 hari) — cuma DAY_WIDTH & RANGE_DAYS yang jadi
+// dinamis ngikut level ini, jadi gak perlu nulis ulang logic tanggal yang
+// udah ada. `showDayNumber` dimatiin di level yang kolomnya kesempitan buat
+// nampilin 2 digit angka tanggal (12px/4px gak muat) — baris nama bulan di
+// atasnya tetap kebaca di semua level.
+const ZOOM_LEVELS = {
+  week: { label: "Minggu", dayWidth: 36, rangeDays: 28, showDayNumber: true },
+  month: { label: "Bulan", dayWidth: 12, rangeDays: 90, showDayNumber: false },
+  quarter: { label: "Kuartal", dayWidth: 4, rangeDays: 364, showDayNumber: false },
+};
 
 function startOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -108,6 +126,8 @@ export default function TimelinePage() {
   const [draftOwnerFilter, setDraftOwnerFilter] = useState([]);
   const [ownerFilter, setOwnerFilter] = useState([]);
   const [anchor, setAnchor] = useState(() => mondayOf(new Date()));
+  const [zoom, setZoom] = useState("week");
+  const { dayWidth: DAY_WIDTH, rangeDays: RANGE_DAYS, showDayNumber } = ZOOM_LEVELS[zoom];
   const [feedback, setFeedback] = useState({
     open: false,
     variant: "error",
@@ -123,13 +143,17 @@ export default function TimelinePage() {
 
   useEffect(() => {
     const el = bodyRef.current;
+    // bodyRef cuma ke-attach ke elemen grid asli pas isLoading udah false
+    // (sebelum itu yang di-render skeleton, bodyRef.current masih null) —
+    // efek ini perlu dependency `isLoading` biar nyoba nge-attach observer
+    // LAGI begitu grid asli beneran ada di DOM, bukan cuma sekali pas mount.
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       setVisibleBodyHeight(entries[0].contentRect.height);
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [isLoading]);
 
   // Header hari cuma ngikutin scroll horizontal dari body (overflow-x-nya
   // di-disable di JSX) — kalau dua-duanya bisa di-scroll user & saling
@@ -262,19 +286,15 @@ export default function TimelinePage() {
           epicRange.end >= rangeStart
             ? epicRange
             : null;
-        const visibleTaskEntries = (tasksByEpic.get(epic.id) ?? [])
-          .map((task) => ({ task, range: dateRange(task) }))
-          .filter(
-            ({ range: r }) => r && r.start <= rangeEnd && r.end >= rangeStart,
-          );
+        const epicTasks = tasksByEpic.get(epic.id) ?? [];
 
         // Epic SELALU tampil sebagai baris grup kalau project-nya expanded —
         // gak ikut aturan "hilang kalau gak match filter tanggal" kayak
-        // Project/Task (disepakati bareng user). Bar tanggal-nya cuma
-        // digambar kalau rentangnya overlap sama periode ini
-        // (`epicVisibleRange` non-null) — `overdue` tetap dihitung dari
-        // rentang ASLI-nya (`epicRange`), gak peduli lagi kelihatan di
-        // periode ini atau enggak.
+        // Project (disepakati bareng user). Bar tanggal-nya cuma digambar
+        // kalau rentangnya overlap sama periode ini (`epicVisibleRange`
+        // non-null) — `overdue` tetap dihitung dari rentang ASLI-nya
+        // (`epicRange`), gak peduli lagi kelihatan di periode ini atau
+        // enggak.
         const epicRow = {
           type: "epic",
           key: `e${epic.id}`,
@@ -282,7 +302,7 @@ export default function TimelinePage() {
           epic,
           range: epicVisibleRange,
           overdue: epicRange ? epicRange.end < today : false,
-          hasTasks: visibleTaskEntries.length > 0,
+          hasTasks: epicTasks.length > 0,
           ...(epicVisibleRange
             ? layoutBar(epicVisibleRange, rangeStart, rangeEnd)
             : {
@@ -295,17 +315,40 @@ export default function TimelinePage() {
 
         if (!expandedEpics.has(epic.id)) return [epicRow];
 
-        const taskRows = visibleTaskEntries
-          .sort((a, b) => a.range.start - b.range.start)
-          .map(({ task, range: r }) => ({
-            type: "task",
-            key: `t${task.id}`,
-            project,
-            epic,
-            task,
-            range: r,
-            ...layoutBar(r, rangeStart, rangeEnd),
-          }));
+        // Task JUGA selalu tampil kalau epic-nya expanded (sama kayak Epic
+        // di atas, disepakati bareng user) — sebelumnya task yang tanggalnya
+        // di luar periode 28 hari ini disembunyikan total, bukan cuma
+        // bar-nya. Bar tanggal cuma digambar kalau rentang task-nya overlap
+        // sama periode ini (`taskVisibleRange` non-null), sama pola kayak
+        // epicVisibleRange.
+        const taskRows = epicTasks
+          .map((task) => ({ task, range: dateRange(task) }))
+          .sort((a, b) => {
+            if (!a.range && !b.range) return 0;
+            if (!a.range) return 1;
+            if (!b.range) return -1;
+            return a.range.start - b.range.start;
+          })
+          .map(({ task, range: r }) => {
+            const taskVisibleRange =
+              r && r.start <= rangeEnd && r.end >= rangeStart ? r : null;
+            return {
+              type: "task",
+              key: `t${task.id}`,
+              project,
+              epic,
+              task,
+              range: taskVisibleRange,
+              ...(taskVisibleRange
+                ? layoutBar(taskVisibleRange, rangeStart, rangeEnd)
+                : {
+                    offset: 0,
+                    duration: 0,
+                    clippedLeft: false,
+                    clippedRight: false,
+                  }),
+            };
+          });
 
         return [epicRow, ...taskRows];
       });
@@ -368,8 +411,13 @@ export default function TimelinePage() {
       epic: row.epic.name,
       assignee: (row.task.assignees ?? []).map((a) => a.name).join(", ") || "-",
       status: statusLabel(row.task.status),
-      startDate: row.range.start ? formatDate(row.range.start) : "-",
-      dueDate: row.range.end ? formatDate(row.range.end) : "-",
+      // Sengaja pakai tanggal ASLI task (row.task.startDate/dueDate), bukan
+      // row.range yang cuma keisi kalau overlap sama periode yang lagi
+      // ditampilin — sama pola kayak export Epic di atas (task yang
+      // tanggalnya di luar periode ini tetap harus ke-export dengan
+      // tanggal aslinya, bukan "-").
+      startDate: row.task.startDate ? formatDate(row.task.startDate) : "-",
+      dueDate: row.task.dueDate ? formatDate(row.task.dueDate) : "-",
     };
   });
 
@@ -381,6 +429,26 @@ export default function TimelinePage() {
   // tetap ngisi sampe bawah walau row-nya dikit — bukan cuma pas-pasan
   // ngikutin jumlah row.
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT, visibleBodyHeight);
+
+  // Segmen bulan buat baris atas header (ala Jira) — tiap segmen ngerentang
+  // dari hari pertama bulan itu yang keliatan di periode ini sampe hari
+  // terakhirnya, biar tetep kebaca lagi bulan apa walau di level zoom yang
+  // angka tanggal per harinya disembunyiin (Bulan/Kuartal).
+  const monthSegments = [];
+  days.forEach((d, i) => {
+    const last = monthSegments[monthSegments.length - 1];
+    if (last && last.year === d.getFullYear() && last.month === d.getMonth()) {
+      last.count += 1;
+    } else {
+      monthSegments.push({
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        startIndex: i,
+        count: 1,
+        label: d.toLocaleDateString("id-ID", { month: "short", year: "numeric" }),
+      });
+    }
+  });
 
   const rangeLabel = `${rangeStart.toLocaleDateString("id-ID", { day: "numeric", month: "long" })} – ${rangeEnd.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
 
@@ -455,6 +523,21 @@ export default function TimelinePage() {
                 })
               }
             />
+            <div className="flex items-center divide-x divide-border border border-border">
+              {Object.entries(ZOOM_LEVELS).map(([key, level]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setZoom(key)}
+                  className={cn(
+                    "px-2.5 py-1.5 text-xs text-muted-foreground",
+                    zoom === key && "bg-primary text-primary-foreground",
+                  )}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -494,36 +577,60 @@ export default function TimelinePage() {
             <div className="flex h-full flex-col overflow-hidden rounded-none border border-border">
               {/* Header: label kolom "Project" + skala tanggal. Skala tanggal
                   cuma ngikutin scroll horizontal body (lihat handleBodyScroll). */}
-              <div className="flex shrink-0 border-b border-border">
-                <div
-                  className="flex shrink-0 items-center border-r border-border px-3 text-muted-foreground"
-                  style={{ width: LABEL_WIDTH, height: HEADER_HEIGHT }}
-                >
-                  Project
-                </div>
-                <div ref={headerScrollRef} className="flex-1 overflow-hidden">
+              <div className="flex shrink-0 flex-col border-b border-border">
+                <div className="flex">
                   <div
-                    className="flex"
-                    style={{ width: gridWidth, height: HEADER_HEIGHT }}
+                    className="flex shrink-0 items-center border-r border-border px-3 text-muted-foreground"
+                    style={{ width: LABEL_WIDTH, height: HEADER_HEIGHT }}
                   >
-                    {days.map((d, i) => {
-                      const isToday = d.getTime() === today.getTime();
-                      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                      return (
-                        <div
-                          key={i}
-                          className={cn(
-                            "flex shrink-0 items-center justify-center border-r border-border/60 text-muted-foreground",
-                            isWeekend && "bg-muted/40",
-                            isToday &&
-                              "bg-primary/10 font-medium text-foreground",
-                          )}
-                          style={{ width: DAY_WIDTH }}
-                        >
-                          {d.getDate()}
-                        </div>
-                      );
-                    })}
+                    Project
+                  </div>
+                  <div ref={headerScrollRef} className="flex-1 overflow-hidden">
+                    <div style={{ width: gridWidth }}>
+                      {/* Baris nama bulan — tetap kebaca walau angka tanggal
+                          per hari disembunyiin di level zoom Bulan/Kuartal
+                          (lihat showDayNumber di ZOOM_LEVELS). */}
+                      <div
+                        className="relative border-b border-border"
+                        style={{ height: MONTH_ROW_HEIGHT }}
+                      >
+                        {monthSegments.map((seg) => (
+                          <div
+                            key={`${seg.year}-${seg.month}`}
+                            className="absolute inset-y-0 flex items-center truncate border-r border-border/60 px-1.5 text-xs text-muted-foreground"
+                            style={{
+                              left: seg.startIndex * DAY_WIDTH,
+                              width: seg.count * DAY_WIDTH,
+                            }}
+                          >
+                            {seg.label}
+                          </div>
+                        ))}
+                      </div>
+                      <div
+                        className="flex"
+                        style={{ height: DAY_ROW_HEIGHT }}
+                      >
+                        {days.map((d, i) => {
+                          const isToday = d.getTime() === today.getTime();
+                          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                          return (
+                            <div
+                              key={i}
+                              className={cn(
+                                "flex shrink-0 items-center justify-center border-r border-border/60 text-muted-foreground",
+                                isWeekend && "bg-muted/40",
+                                isToday &&
+                                  "bg-primary/10 font-medium text-foreground",
+                              )}
+                              style={{ width: DAY_WIDTH }}
+                            >
+                              {showDayNumber && d.getDate()}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -646,7 +753,7 @@ export default function TimelinePage() {
                 </div>
 
                 <div
-                  className="scrollbar-hidden flex-1 overflow-x-auto"
+                  className="scrollbar-hidden flex-1 self-start overflow-x-auto overflow-y-hidden"
                   onScroll={handleBodyScroll}
                   onWheel={handleGridWheel}
                 >
