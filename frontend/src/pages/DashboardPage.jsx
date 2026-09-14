@@ -405,12 +405,19 @@ export default function DashboardPage() {
 
   // Ukur lebar container heatmap-nya. react-heat-map nentuin jumlah kolom
   // minggu yang dirender lewat floor((clientWidth-leftPad)/(rectSize+space))
-  // — pembagian bulat, gak bisa "dibalik" buat nyari rectSize yang bikin
-  // grid-nya pas ngisi penuh (selalu ada sisa pembulatan). Jadi dibalik:
-  // rectSize dikunci, terus KITA yang hitung persis pakai rumus yang sama
-  // berapa kolom yang muat, baru startDate-nya diundur sesuai jumlah kolom
-  // itu — dijamin pas penuh karena bukan nebak lagi, ngikutin rumus yang
-  // sama persis dengan punya library-nya.
+  // — rumus yang sama kita pakai di sini buat nebak berapa kolom yang muat,
+  // baru startDate-nya diundur sesuai itu. TAPI library-nya ngukur clientWidth
+  // dari elemen <svg> asli (integer, useEffect sendiri), sedangkan kita ngukur
+  // contentRect wrapper div-nya (float, ResizeObserver kita sendiri) — dua
+  // pengukuran independen yang KADANG beda dikit, cukup buat nge-geser hasil
+  // floor()-nya 1 kolom. Kalau tebakan kita KELEBIHAN (lebih banyak dari
+  // kolom yang beneran dirender library), startDate jadi kemunduran, dan
+  // karena Day.tsx cuma ngegambar maju gridNum minggu DARI startDate itu
+  // (bukan mundur dari endDate), sisa hari paling baru — termasuk HARI INI —
+  // malah kepotong duluan (bug yang dilaporin user). Makanya sengaja
+  // dikurangin margin aman (-2 minggu) di bawah: mending riwayat yang
+  // ditampilin dikit lebih pendek dari kolom yang sebenarnya muat, daripada
+  // task hari ini hilang dari grid.
   // Pakai callback ref (bukan useRef + effect ber-deps kosong) karena div-nya
   // baru muncul belakangan (nunggu isLoading kelar) — effect ber-deps [] gak
   // akan pernah lihat elemen aslinya kalau baru muncul setelah mount pertama.
@@ -435,7 +442,7 @@ export default function DashboardPage() {
       1,
       Math.floor(
         (heatmapWidth - HEATMAP_LEFT_PAD) / (heatmapRectSize + HEATMAP_SPACE),
-      ),
+      ) - 2,
     );
   }, [heatmapWidth, heatmapRectSize]);
 
@@ -571,7 +578,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Project</Label>
               <Combobox
                 options={projectFilterOptions}
@@ -579,11 +586,11 @@ export default function DashboardPage() {
                 onValueChange={(v) => updateDraft("projectId", v)}
                 searchPlaceholder="Cari project..."
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Assignee</Label>
               <Combobox
                 options={assigneeFilterOptions}
@@ -594,30 +601,30 @@ export default function DashboardPage() {
                 renderOption={renderAssigneeOption}
                 renderValue={renderAssigneeOption}
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-64 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Periode (bulan)</Label>
               <div className="flex items-center gap-1.5">
                 <MonthPicker
                   value={draftFilters.dateFrom}
                   onChange={(value) => setDraftFilters((prev) => ({ ...prev, dateFrom: value }))}
                   placeholder="Dari"
-                  className="w-32"
+                  className="min-w-0 flex-1"
                 />
                 <span className="text-muted-foreground">–</span>
                 <MonthPicker
                   value={draftFilters.dateTo}
                   onChange={(value) => setDraftFilters((prev) => ({ ...prev, dateTo: value }))}
                   placeholder="Sampai"
-                  className="w-32"
+                  className="min-w-0 flex-1"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>
