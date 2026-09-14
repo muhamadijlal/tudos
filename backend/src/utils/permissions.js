@@ -33,6 +33,7 @@ export const PERMISSIONS = [
   },
   { key: "tasks.viewAll", group: "Tasks", label: "Lihat semua task (bukan cuma miliknya)" },
   { key: "tasks.assignOthers", group: "Tasks", label: "Assign task ke user lain" },
+  { key: "epics.assignOwner", group: "Epics", label: "Assign owner epic ke user lain" },
 ];
 
 export const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);

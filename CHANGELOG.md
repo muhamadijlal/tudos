@@ -2,6 +2,12 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.4] - 2026-09-14
+
+### Changed
+- Field Owner di form Epic (Management Epic) sekarang cuma bisa diisi bebas oleh role Admin — role lain otomatis terkunci ke diri sendiri sebagai owner (gak ada pilihan lain), baik di form maupun dicek ulang di server. Permission baru `epics.assignOwner`, otomatis cuma dikasih ke role Admin (role lain bisa di-toggle manual di Role Management kalau memang perlu).
+- Title tab browser sekarang diambil dari env `VITE_APP_NAME` (default "Tudos"), gak lagi hardcode "frontend" di `index.html`.
+
 ## [2.0.0-beta.3] - 2026-09-14
 
 ### Added

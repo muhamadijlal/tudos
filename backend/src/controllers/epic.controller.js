@@ -38,7 +38,7 @@ const getEpicById = async (req, res, next) => {
 const createEpic = async (req, res, next) => {
   try {
     const projectId = Number(req.params.id);
-    const epic = await epicService.create(projectId, req.user.id, req.body);
+    const epic = await epicService.create(projectId, req.user, req.body);
 
     res.status(201).json({
       success: true,
@@ -53,7 +53,7 @@ const createEpic = async (req, res, next) => {
 const updateEpic = async (req, res, next) => {
   try {
     const epicId = Number(req.params.id);
-    const epic = await epicService.update(epicId, req.user.id, req.body);
+    const epic = await epicService.update(epicId, req.user, req.body);
 
     res.status(200).json({
       success: true,

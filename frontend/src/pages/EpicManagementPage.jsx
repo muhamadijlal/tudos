@@ -36,6 +36,7 @@ import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
 import { epicPeriodLabel } from "@/lib/epic";
 import { EPIC_COLOR_DOT, EPIC_COLOR_OPTIONS } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
+import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { collectErrors, validateRequired } from "@/lib/validation";
 import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
@@ -78,6 +79,7 @@ function EpicProgressBar({ progress }) {
 // derivation di Kanban/Tudos, biar gak perlu GET /epics flat).
 export default function EpicManagementPage() {
   const { user } = useAuth();
+  const canAssignOwner = hasPermission(user, "epics.assignOwner");
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,6 +115,17 @@ export default function EpicManagementPage() {
     { value: "", label: "Tanpa owner" },
     ...users.map((u) => ({ value: String(u.id), label: u.name })),
   ];
+
+  function renderOwnerOption(option) {
+    if (option.value === "") return option.label;
+    const isSelf = String(option.value) === String(user?.id);
+    return (
+      <span>
+        {option.label}
+        {isSelf && " (Kamu)"}
+      </span>
+    );
+  }
 
   const filteredEpics = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -175,7 +188,10 @@ export default function EpicManagementPage() {
 
   function openCreateForm() {
     setEditingEpic(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      userId: canAssignOwner ? "" : String(user?.id ?? ""),
+    });
     setFieldErrors({});
     setFormOpen(true);
   }
@@ -476,14 +492,22 @@ export default function EpicManagementPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Owner</Label>
-              <Combobox
-                options={userOptions}
-                value={form.userId}
-                onValueChange={(value) => setForm((prev) => ({ ...prev, userId: value }))}
-                placeholder="Tanpa owner"
-                searchPlaceholder="Cari user..."
-                emptyText="User tidak ditemukan."
-              />
+              {canAssignOwner ? (
+                <Combobox
+                  options={userOptions}
+                  value={form.userId}
+                  onValueChange={(value) => setForm((prev) => ({ ...prev, userId: value }))}
+                  placeholder="Tanpa owner"
+                  searchPlaceholder="Cari user..."
+                  emptyText="User tidak ditemukan."
+                  renderOption={renderOwnerOption}
+                  renderValue={renderOwnerOption}
+                />
+              ) : (
+                <p className="flex h-8 items-center text-xs text-muted-foreground">
+                  {user?.name} (Kamu)
+                </p>
+              )}
             </div>
             {editingEpic && (
               <div className="flex flex-col gap-1.5">

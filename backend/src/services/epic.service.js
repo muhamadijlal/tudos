@@ -12,6 +12,21 @@ function assertIsOwner(project, requesterId) {
   }
 }
 
+// User dengan permission epics.assignOwner bebas assign owner epic ke siapa
+// aja (atau kosongin/"Tanpa owner"). Selain itu owner-nya cuma boleh diri
+// sendiri — beda dari assertCanAssign di task.service.js, di sini gak ada
+// pengecualian "project owner" karena requester epic SELALU project owner
+// (lihat assertIsOwner di atas), jadi percuma kalau dipakai juga di sini.
+function assertCanAssignOwner(requester, targetUserId) {
+  if (targetUserId === undefined || requester.permissions.includes("epics.assignOwner")) {
+    return;
+  }
+
+  if (targetUserId !== requester.id) {
+    throw new ApiError(403, "Kamu hanya bisa jadi owner epic untuk diri sendiri");
+  }
+}
+
 export async function findAllByProject(projectId) {
   const project = await prisma.project.findFirst({
     where: { id: projectId, deletedAt: null },
@@ -50,13 +65,14 @@ export async function findById(epicId) {
   return epic;
 }
 
-export async function create(projectId, requesterId, data) {
+export async function create(projectId, requester, data) {
   const project = await prisma.project.findFirst({
     where: { id: projectId, deletedAt: null },
   });
 
   if (!project) throw new ApiError(404, "Project not found");
-  assertIsOwner(project, requesterId);
+  assertIsOwner(project, requester.id);
+  assertCanAssignOwner(requester, data.userId ?? null);
 
   const code = await generateUniqueEpicCode(data.name);
   // Warna di-assign otomatis round-robin berdasarkan jumlah epic yang udah
@@ -80,14 +96,15 @@ export async function create(projectId, requesterId, data) {
   });
 }
 
-export async function update(epicId, requesterId, data) {
+export async function update(epicId, requester, data) {
   const epic = await prisma.epic.findFirst({
     where: { id: epicId, deletedAt: null },
     include: { project: true },
   });
 
   if (!epic) throw new ApiError(404, "Epic not found");
-  assertIsOwner(epic.project, requesterId);
+  assertIsOwner(epic.project, requester.id);
+  assertCanAssignOwner(requester, data.userId);
 
   // code/projectId/taskCounter gak bisa diubah lewat sini — immutable pas
   // udah dibuat, sama kayak project.code sebelumnya. `color` boleh diganti
