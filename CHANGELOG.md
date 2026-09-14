@@ -2,6 +2,27 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0-beta.6] - 2026-09-14
+
+### Added
+- Level zoom Minggu/Bulan/Kuartal di Timeline (ala Jira) — ganti lebar kolom per hari & rentang tanggal yang ditampilin, gak nyentuh cara bar/tanggal di-render.
+
+### Changed
+- Transisi status Todo -> In Review sekarang wajib catatan review juga (sebelumnya cuma In Progress -> In Review yang wajib) — konsisten di kedua arah dari/ke In Review.
+- Popup export Daily Activity di-skip otomatis (langsung download) kalau profil user (identitas + Penanggung Jawab) udah lengkap.
+- Task di Timeline sekarang selalu tampil sebagai baris walau tanggalnya di luar periode 28 hari yang lagi ditampilin (bar-nya aja yang gak digambar) — sama kayak perilaku Epic.
+- Timeline sekarang default expand semua Project & Epic pas dibuka (sebelumnya collapsed semua, harus klik satu-satu).
+- Field Owner di form Epic sekarang nampilin foto profil + nama profil (fullName), bukan cuma nama akun.
+- Form create/edit Epic dan tombol "Epic Baru" dihapus dari halaman Detail Project — epic sekarang cuma dikelola lewat halaman Management Epic (list Epic & tombol Hapus tetap ada).
+- Filter Assignee di Kanban sekarang ngikutin pola yang sama kayak Tudos: dikunci ke diri sendiri (disabled) buat role yang gak punya `tasks.viewAll`.
+- Filter di Dashboard sekarang ngisi lebar penuh card (sebelumnya field-nya kecil nge-cluster di kiri, nyisain banyak ruang kosong di layar lebar).
+
+### Fixed
+- Grid Timeline (garis background weekend/hari-ini) gak sejajar lagi sama baris label pas di-scroll jauh ke bawah — konstanta tinggi baris yang kepake di kolom label & grid disamain lagi.
+- Grid Timeline sekarang tetap muncul (gak blank/0-tinggi) walau belum ada project sama sekali.
+- Kolom tanggal Timeline gak lagi bisa scroll vertikal sendirian, terpisah dari kolom project — sekarang scroll bareng dalam 1 kontainer.
+- Heatmap "Aktivitas 1 Tahun Terakhir" di Dashboard sekarang gak motong ~1 minggu terakhir termasuk hari ini — task yang dibuat hari ini sekarang muncul di grid.
+
 ## [2.0.0-beta.5] - 2026-09-14
 
 ### Changed
