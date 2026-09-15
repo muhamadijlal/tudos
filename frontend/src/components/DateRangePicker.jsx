@@ -56,6 +56,20 @@ export function DateRangePicker({
             })
           }
         />
+        {/* Kalender "required" gak bisa di-clear lewat klik biasa — ini
+            satu-satunya jalan keluar dari rentang tanggal ke "semua tanggal"
+            tanpa harus nge-reset filter lain lewat tombol "Reset Filter". */}
+        <div className="border-t p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={() => onChange({ from: "", to: "" })}
+          >
+            Semua Tanggal
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );

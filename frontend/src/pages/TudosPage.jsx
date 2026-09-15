@@ -41,6 +41,7 @@ import {
   STATUS_OPTIONS,
   STATUS_STYLES,
   statusLabel,
+  todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
 import { FunnelSimple, Info, Plus } from "@phosphor-icons/react";
@@ -75,10 +76,14 @@ function matchesTaskOwnership(task, ownershipFilter, currentUser) {
   return true;
 }
 
-// Default filter: due date terkunci ke hari ini (bukan "semua tanggal"), dan
-// assignee dikunci ke diri sendiri buat yang gak bisa lihat semua task.
-// Dipakai buat state awal (draft & applied) dan buat "Reset Filter".
+// Default filter: due date terkunci ke hari ini, dan assignee dikunci ke diri
+// sendiri buat yang gak bisa lihat semua task. Dipakai buat state awal
+// (draft & applied) dan buat "Reset Filter". Task todo/belum-assign yang
+// due date-nya di luar hari ini tetep kelihatan lewat banner "perlu
+// perhatian" di bawah filter (lihat hiddenByPeriodTasks) — jadi gak
+// kesembunyiin diam-diam biarpun defaultnya cuma hari ini.
 function defaultFilters(canViewAllTasks, currentUser) {
+  const today = todayDateStr();
   return {
     projectId: ALL,
     epicId: ALL,
@@ -86,11 +91,8 @@ function defaultFilters(canViewAllTasks, currentUser) {
     userId: canViewAllTasks ? ALL : String(currentUser?.id ?? ""),
     priority: ALL,
     status: ALL,
-    // Default "Semua Tanggal" (gak dikunci ke hari ini) — samain sama Kanban,
-    // biar gak nyembunyiin task todo/belum-assign secara diam-diam pas
-    // pertama buka halaman. Filter periode tetep bisa dipilih manual kalau mau.
-    dueDateFrom: "",
-    dueDateTo: "",
+    dueDateFrom: today,
+    dueDateTo: today,
   };
 }
 

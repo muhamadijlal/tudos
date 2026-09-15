@@ -11,7 +11,12 @@ import { MultiCombobox } from "@/components/MultiCombobox";
 import { ReviewNoteDialog } from "@/components/ReviewNoteDialog";
 import { TaskDetailSheet } from "@/components/TaskDetailSheet";
 import { TaskFormDialog } from "@/components/TaskFormDialog";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,14 +35,15 @@ import { filenamePeriodSuffix } from "@/lib/export";
 import { hasPermission } from "@/lib/permissions";
 import {
   formatDate,
-  priorityLabel,
   PRIORITY_OPTIONS,
   PRIORITY_STYLES,
+  priorityLabel,
   requiresApproveConfirm,
   requiresReviewNote,
-  statusLabel,
   STATUS_DOT,
   STATUS_OPTIONS,
+  statusLabel,
+  todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
 import { FunnelSimple, Info, Plus } from "@phosphor-icons/react";
@@ -57,8 +63,15 @@ function parseIdsParam(searchParams, key) {
   return raw ? raw.split(",").filter(Boolean) : [];
 }
 
+// Default filter periode dikunci ke hari ini — kalau param-nya belum ada di
+// URL sama sekali (kunjungan baru), pakai hari ini. User yang sengaja milih
+// "Semua Tanggal" nyimpen pilihannya sebagai literal "all" di URL (bukan
+// cuma dihapus), biar reload/share link gak diam-diam balik ke hari ini.
 function parseDateParam(searchParams, key) {
-  return searchParams.get(key) || "";
+  const raw = searchParams.get(key);
+  if (raw === null) return todayDateStr();
+  if (raw === "all") return "";
+  return raw;
 }
 
 // Task yang butuh perhatian meski due date-nya di luar periode: belum
@@ -78,7 +91,8 @@ const TASK_OWNERSHIP_FILTERS = [
 ];
 
 function matchesTaskOwnership(task, ownershipFilter, currentUser) {
-  if (ownershipFilter === "myProjects") return task.project?.user?.id === currentUser?.id;
+  if (ownershipFilter === "myProjects")
+    return task.project?.user?.id === currentUser?.id;
   if (ownershipFilter === "assignedToMe") {
     return (task.assignees ?? []).some((a) => a.id === currentUser?.id);
   }
@@ -98,24 +112,34 @@ function TaskCard({ task, onDragStart, onClick }) {
       draggable
       onDragStart={(e) => onDragStart(e, task.id)}
       onClick={() => onClick(task)}
-      className="cursor-grab space-y-3 border border-border bg-card p-4 text-xs hover:bg-muted/50 active:cursor-grabbing"
+      className="min-w-0 cursor-grab space-y-3 border border-border bg-card p-4 text-xs hover:bg-muted/50 active:cursor-grabbing"
     >
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <CodeBadge>{task.code}</CodeBadge>
           <EpicBadge epic={task.epic} />
         </div>
-        <p className="font-medium leading-relaxed">{task.name}</p>
+        <p className="wrap-break-word font-medium leading-relaxed">
+          {task.name}
+        </p>
         {task.description && (
-          <p className="line-clamp-2 text-muted-foreground">{task.description}</p>
+          <p className="line-clamp-2 wrap-break-word text-muted-foreground">
+            {task.description}
+          </p>
         )}
       </div>
-      <p className="text-muted-foreground">{task.project?.name ?? "-"}</p>
-      <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline">{task.category?.name ?? "-"}</Badge>
-        <Badge className={PRIORITY_STYLES[task.priority]}>{priorityLabel(task.priority)}</Badge>
+      <p className="wrap-break-word text-muted-foreground">
+        {task.project?.name ?? "-"}
+      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Badge variant="outline" className="max-w-full">
+          <span className="truncate">{task.category?.name ?? "-"}</span>
+        </Badge>
+        <Badge className={cn("max-w-full", PRIORITY_STYLES[task.priority])}>
+          {priorityLabel(task.priority)}
+        </Badge>
       </div>
-      <div className="flex items-center justify-between text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 text-muted-foreground">
         <AssigneeAvatarGroup assignees={task.assignees} size="xs" />
         <DueDateBadge task={task} />
       </div>
@@ -176,9 +200,13 @@ export default function KanbanPage() {
   const [draftProjectFilter, setDraftProjectFilter] = useState(() =>
     parseIdsParam(searchParams, "project"),
   );
-  const [draftEpicFilter, setDraftEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
+  const [draftEpicFilter, setDraftEpicFilter] = useState(() =>
+    parseIdsParam(searchParams, "epic"),
+  );
   const [draftAssigneeFilter, setDraftAssigneeFilter] = useState(() =>
-    canViewAllTasks ? parseIdsParam(searchParams, "assignee") : [String(currentUser?.id ?? "")],
+    canViewAllTasks
+      ? parseIdsParam(searchParams, "assignee")
+      : [String(currentUser?.id ?? "")],
   );
   const [draftCategoryFilter, setDraftCategoryFilter] = useState(() =>
     parseIdsParam(searchParams, "category"),
@@ -189,22 +217,47 @@ export default function KanbanPage() {
   const [draftStatusFilter, setDraftStatusFilter] = useState(() =>
     parseIdsParam(searchParams, "status"),
   );
-  const [draftDueDateFrom, setDraftDueDateFrom] = useState(() => parseDateParam(searchParams, "dueFrom"));
-  const [draftDueDateTo, setDraftDueDateTo] = useState(() => parseDateParam(searchParams, "dueTo"));
-  const [projectFilter, setProjectFilter] = useState(() => parseIdsParam(searchParams, "project"));
-  const [epicFilter, setEpicFilter] = useState(() => parseIdsParam(searchParams, "epic"));
-  const [assigneeFilter, setAssigneeFilter] = useState(() =>
-    canViewAllTasks ? parseIdsParam(searchParams, "assignee") : [String(currentUser?.id ?? "")],
+  const [draftDueDateFrom, setDraftDueDateFrom] = useState(() =>
+    parseDateParam(searchParams, "dueFrom"),
   );
-  const [categoryFilter, setCategoryFilter] = useState(() => parseIdsParam(searchParams, "category"));
-  const [priorityFilter, setPriorityFilter] = useState(() => parseIdsParam(searchParams, "priority"));
-  const [statusFilter, setStatusFilter] = useState(() => parseIdsParam(searchParams, "status"));
-  const [dueDateFrom, setDueDateFrom] = useState(() => parseDateParam(searchParams, "dueFrom"));
-  const [dueDateTo, setDueDateTo] = useState(() => parseDateParam(searchParams, "dueTo"));
+  const [draftDueDateTo, setDraftDueDateTo] = useState(() =>
+    parseDateParam(searchParams, "dueTo"),
+  );
+  const [projectFilter, setProjectFilter] = useState(() =>
+    parseIdsParam(searchParams, "project"),
+  );
+  const [epicFilter, setEpicFilter] = useState(() =>
+    parseIdsParam(searchParams, "epic"),
+  );
+  const [assigneeFilter, setAssigneeFilter] = useState(() =>
+    canViewAllTasks
+      ? parseIdsParam(searchParams, "assignee")
+      : [String(currentUser?.id ?? "")],
+  );
+  const [categoryFilter, setCategoryFilter] = useState(() =>
+    parseIdsParam(searchParams, "category"),
+  );
+  const [priorityFilter, setPriorityFilter] = useState(() =>
+    parseIdsParam(searchParams, "priority"),
+  );
+  const [statusFilter, setStatusFilter] = useState(() =>
+    parseIdsParam(searchParams, "status"),
+  );
+  const [dueDateFrom, setDueDateFrom] = useState(() =>
+    parseDateParam(searchParams, "dueFrom"),
+  );
+  const [dueDateTo, setDueDateTo] = useState(() =>
+    parseDateParam(searchParams, "dueTo"),
+  );
   const [ownershipFilter, setOwnershipFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [detailTask, setDetailTask] = useState(null);
-  const [feedback, setFeedback] = useState({ open: false, variant: "error", title: "", description: "" });
+  const [feedback, setFeedback] = useState({
+    open: false,
+    variant: "error",
+    title: "",
+    description: "",
+  });
   const [reviewPrompt, setReviewPrompt] = useState(null);
   const [approveConfirmTaskId, setApproveConfirmTaskId] = useState(null);
 
@@ -216,12 +269,13 @@ export default function KanbanPage() {
       // dibatasin permission users.view) — assign task ke orang lain sekarang
       // bisa dilakuin siapa aja yang jadi owner project-nya, jadi daftar
       // user buat di-assign harus keliatan buat siapa aja yang login.
-      const [tasksRes, projectsRes, categoriesRes, usersRes] = await Promise.all([
-        api.get("/tasks"),
-        api.get("/projects"),
-        api.get("/categories"),
-        api.get("/users/assignable"),
-      ]);
+      const [tasksRes, projectsRes, categoriesRes, usersRes] =
+        await Promise.all([
+          api.get("/tasks"),
+          api.get("/projects"),
+          api.get("/categories"),
+          api.get("/users/assignable"),
+        ]);
       setTasks(tasksRes.data);
       setProjects(projectsRes.data);
       setCategories(categoriesRes.data);
@@ -247,8 +301,11 @@ export default function KanbanPage() {
     if (categoryFilter.length) next.category = categoryFilter.join(",");
     if (priorityFilter.length) next.priority = priorityFilter.join(",");
     if (statusFilter.length) next.status = statusFilter.join(",");
-    if (dueDateFrom) next.dueFrom = dueDateFrom;
-    if (dueDateTo) next.dueTo = dueDateTo;
+    // Selalu ditulis (gak cuma kalau keisi) — "Semua Tanggal" (nilai "")
+    // ditulis literal sebagai "all" biar reload/share link inget itu pilihan
+    // sengaja, bukan diam-diam balik ke default hari ini.
+    next.dueFrom = dueDateFrom || "all";
+    next.dueTo = dueDateTo || "all";
     setSearchParams(next, { replace: true });
   }, [
     projectFilter,
@@ -263,7 +320,10 @@ export default function KanbanPage() {
   ]);
 
   function showMore(status) {
-    setVisibleCounts((prev) => ({ ...prev, [status]: (prev[status] ?? PAGE_SIZE) + PAGE_SIZE }));
+    setVisibleCounts((prev) => ({
+      ...prev,
+      [status]: (prev[status] ?? PAGE_SIZE) + PAGE_SIZE,
+    }));
   }
 
   function applyFilters() {
@@ -279,23 +339,26 @@ export default function KanbanPage() {
   }
 
   function resetFilters() {
-    const resetAssignee = canViewAllTasks ? [] : [String(currentUser?.id ?? "")];
+    const resetAssignee = canViewAllTasks
+      ? []
+      : [String(currentUser?.id ?? "")];
+    const today = todayDateStr();
     setDraftProjectFilter([]);
     setDraftEpicFilter([]);
     setDraftAssigneeFilter(resetAssignee);
     setDraftCategoryFilter([]);
     setDraftPriorityFilter([]);
     setDraftStatusFilter([]);
-    setDraftDueDateFrom("");
-    setDraftDueDateTo("");
+    setDraftDueDateFrom(today);
+    setDraftDueDateTo(today);
     setProjectFilter([]);
     setEpicFilter([]);
     setAssigneeFilter(resetAssignee);
     setCategoryFilter([]);
     setPriorityFilter([]);
     setStatusFilter([]);
-    setDueDateFrom("");
-    setDueDateTo("");
+    setDueDateFrom(today);
+    setDueDateTo(today);
     setVisibleCounts({});
   }
 
@@ -315,7 +378,10 @@ export default function KanbanPage() {
     (p.epics ?? []).map((e) => ({ ...e, projectId: p.id })),
   );
 
-  const projectFilterOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
+  const projectFilterOptions = projects.map((p) => ({
+    value: String(p.id),
+    label: p.name,
+  }));
   // Filter Epic cascading dari filter Project (draft) — kalau belum ada
   // project yang dipilih, tampilin semua epic lintas project.
   const epicFilterOptions = (
@@ -325,18 +391,36 @@ export default function KanbanPage() {
   ).map((e) => ({ value: String(e.id), label: e.name, color: e.color }));
   const assigneeFilterOptions = canViewAllTasks
     ? users.map((u) => ({ value: String(u.id), label: u.name }))
-    : [{ value: String(currentUser?.id ?? ""), label: currentUser?.name ?? "Kamu" }];
-  const categoryFilterOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
-  const priorityFilterOptions = PRIORITY_OPTIONS.map((p) => ({ value: p.value, label: p.label }));
-  const statusFilterOptions = STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }));
+    : [
+        {
+          value: String(currentUser?.id ?? ""),
+          label: currentUser?.name ?? "Kamu",
+        },
+      ];
+  const categoryFilterOptions = categories.map((c) => ({
+    value: String(c.id),
+    label: c.name,
+  }));
+  const priorityFilterOptions = PRIORITY_OPTIONS.map((p) => ({
+    value: p.value,
+    label: p.label,
+  }));
+  const statusFilterOptions = STATUS_OPTIONS.map((s) => ({
+    value: s.value,
+    label: s.label,
+  }));
 
   function matchesNonPeriodFilters(t) {
     return (
-      (projectFilter.length === 0 || projectFilter.includes(String(t.project?.id))) &&
+      (projectFilter.length === 0 ||
+        projectFilter.includes(String(t.project?.id))) &&
       (epicFilter.length === 0 || epicFilter.includes(String(t.epic?.id))) &&
       (assigneeFilter.length === 0 ||
-        (t.assignees ?? []).some((a) => assigneeFilter.includes(String(a.id)))) &&
-      (categoryFilter.length === 0 || categoryFilter.includes(String(t.category?.id))) &&
+        (t.assignees ?? []).some((a) =>
+          assigneeFilter.includes(String(a.id)),
+        )) &&
+      (categoryFilter.length === 0 ||
+        categoryFilter.includes(String(t.category?.id))) &&
       (priorityFilter.length === 0 || priorityFilter.includes(t.priority)) &&
       (statusFilter.length === 0 || statusFilter.includes(t.status)) &&
       matchesTaskOwnership(t, ownershipFilter, currentUser)
@@ -344,7 +428,8 @@ export default function KanbanPage() {
   }
 
   const filteredTasks = tasks.filter(
-    (t) => matchesNonPeriodFilters(t) && matchesDueDate(t, dueDateFrom, dueDateTo),
+    (t) =>
+      matchesNonPeriodFilters(t) && matchesDueDate(t, dueDateFrom, dueDateTo),
   );
 
   const exportColumns = [
@@ -383,7 +468,9 @@ export default function KanbanPage() {
   const hiddenByPeriodTasks = isPeriodActive
     ? tasks.filter(
         (t) =>
-          matchesNonPeriodFilters(t) && !matchesDueDate(t, dueDateFrom, dueDateTo) && needsAttention(t),
+          matchesNonPeriodFilters(t) &&
+          !matchesDueDate(t, dueDateFrom, dueDateTo) &&
+          needsAttention(t),
       )
     : [];
 
@@ -397,7 +484,9 @@ export default function KanbanPage() {
   // dan gak nutup dialognya sendiri, biar user bisa coba lagi.
   async function applyStatusChange(taskId, status, reviewNote) {
     const previous = tasks;
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status } : t)),
+    );
     try {
       await api.put(`/tasks/${taskId}`, { status, reviewNote });
     } catch (err) {
@@ -406,7 +495,10 @@ export default function KanbanPage() {
         open: true,
         variant: "error",
         title: "Gagal mengubah status",
-        description: err instanceof ApiError ? err.message : "Terjadi kesalahan tak terduga.",
+        description:
+          err instanceof ApiError
+            ? err.message
+            : "Terjadi kesalahan tak terduga.",
       });
       throw err;
     }
@@ -442,8 +534,8 @@ export default function KanbanPage() {
             <FunnelSimple /> Filter
           </CardTitle>
           <CardDescription>
-            Saring board berdasarkan project, epic, kategori, assignee, prioritas, status, dan
-            periode.
+            Saring board berdasarkan project, epic, kategori, assignee,
+            prioritas, status, dan periode.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -559,11 +651,16 @@ export default function KanbanPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={resetFilters}
+              >
                 Reset Filter
               </Button>
             </div>
@@ -579,7 +676,12 @@ export default function KanbanPage() {
           period={filenamePeriodSuffix(dueDateFrom, dueDateTo)}
           dailyActivityTasks={dailyActivityTasks}
           onError={(message) =>
-            setFeedback({ open: true, variant: "error", title: "Gagal export", description: message })
+            setFeedback({
+              open: true,
+              variant: "error",
+              title: "Gagal export",
+              description: message,
+            })
           }
         />
         <Button size="sm" onClick={() => setFormOpen(true)}>
@@ -593,14 +695,21 @@ export default function KanbanPage() {
         <Alert className="shrink-0">
           <Info />
           <AlertTitle>
-            {hiddenByPeriodTasks.length} task belum dikerjakan/belum di-assign di luar periode ini
+            {hiddenByPeriodTasks.length} task belum dikerjakan/belum di-assign
+            di luar periode ini
           </AlertTitle>
           <AlertDescription>
-            Task berstatus To Do atau yang belum ada assignee-nya tetap butuh perhatian meski due
-            date-nya di luar rentang tanggal yang lagi difilter.
+            Task berstatus To Do atau yang belum ada assignee-nya tetap butuh
+            perhatian meski due date-nya di luar rentang tanggal yang lagi
+            difilter.
           </AlertDescription>
           <AlertAction>
-            <Button type="button" variant="outline" size="sm" onClick={resetPeriodFilter}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetPeriodFilter}
+            >
               Tampilkan
             </Button>
           </AlertAction>
@@ -609,7 +718,7 @@ export default function KanbanPage() {
       {isLoading ? (
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {STATUS_OPTIONS.map((column) => (
-            <Card key={column.value} className="h-full min-h-0">
+            <Card key={column.value} className="h-full min-h-0 min-w-0">
               <CardHeader className="shrink-0">
                 <CardTitle>
                   <Skeleton className="h-4 w-20" />
@@ -626,7 +735,9 @@ export default function KanbanPage() {
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {STATUS_OPTIONS.map((column) => {
-            const columnTasks = filteredTasks.filter((t) => t.status === column.value);
+            const columnTasks = filteredTasks.filter(
+              (t) => t.status === column.value,
+            );
             const visibleCount = visibleCounts[column.value] ?? PAGE_SIZE;
             const visibleTasks = columnTasks.slice(0, visibleCount);
             const remaining = columnTasks.length - visibleTasks.length;
@@ -638,20 +749,28 @@ export default function KanbanPage() {
                   e.preventDefault();
                   setDragOverStatus(column.value);
                 }}
-                onDragLeave={() => setDragOverStatus((s) => (s === column.value ? null : s))}
+                onDragLeave={() =>
+                  setDragOverStatus((s) => (s === column.value ? null : s))
+                }
                 onDrop={(e) => handleDrop(e, column.value)}
                 className={cn(
-                  "h-full min-h-0",
-                  dragOverStatus === column.value ? "ring-2 ring-ring" : undefined,
+                  "h-full min-h-0 min-w-0",
+                  dragOverStatus === column.value
+                    ? "ring-2 ring-ring"
+                    : undefined,
                 )}
               >
                 <CardHeader className="shrink-0">
                   <CardTitle className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <span className={`size-2 rounded-full ${STATUS_DOT[column.value]}`} />
+                      <span
+                        className={`size-2 rounded-full ${STATUS_DOT[column.value]}`}
+                      />
                       {column.label}
                     </span>
-                    <span className="text-muted-foreground">{columnTasks.length}</span>
+                    <span className="text-muted-foreground">
+                      {columnTasks.length}
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
@@ -699,7 +818,12 @@ export default function KanbanPage() {
         currentUser={currentUser}
         onSaved={loadData}
         onError={(message) =>
-          setFeedback({ open: true, variant: "error", title: "Gagal membuat task", description: message })
+          setFeedback({
+            open: true,
+            variant: "error",
+            title: "Gagal membuat task",
+            description: message,
+          })
         }
       />
 
@@ -716,7 +840,9 @@ export default function KanbanPage() {
         onOpenChange={(open) => !open && setReviewPrompt(null)}
         fromStatus={reviewPrompt?.fromStatus}
         toStatus={reviewPrompt?.toStatus}
-        onSubmit={(note) => applyStatusChange(reviewPrompt.taskId, reviewPrompt.toStatus, note)}
+        onSubmit={(note) =>
+          applyStatusChange(reviewPrompt.taskId, reviewPrompt.toStatus, note)
+        }
       />
 
       <ConfirmDialog
@@ -725,7 +851,9 @@ export default function KanbanPage() {
         title="Setujui task ini?"
         description="Task bakal ditandai selesai (Done) dan semua assignee bakal dapet notifikasi."
         confirmLabel="Setujui"
-        onConfirm={() => applyStatusChange(approveConfirmTaskId, "done").catch(() => {})}
+        onConfirm={() =>
+          applyStatusChange(approveConfirmTaskId, "done").catch(() => {})
+        }
       />
 
       <TaskDetailSheet

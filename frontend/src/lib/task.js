@@ -96,6 +96,16 @@ export function formatDate(value) {
   });
 }
 
+// yyyy-mm-dd hari ini di zona waktu lokal (bukan toISOString, biar gak
+// kegeser ke UTC) — default filter periode (Tudos/Kanban) dikunci ke hari
+// ini, jadi butuh string ini buat nilai awal dueDateFrom/dueDateTo.
+export function todayDateStr() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 // Sama kayak formatDate tapi ikut nampilin jam — dipakai buat timestamp yang
 // presisi-nya lebih penting (komentar, riwayat status, notifikasi).
 export function formatDateTime(value) {

@@ -1,5 +1,6 @@
 import FullscreenLoader from "@/components/FullscreenLoader";
 import { useAuth } from "@/context/AuthContext";
+import { getDefaultPath } from "@/lib/nav";
 import { hasPermission } from "@/lib/permissions";
 import { Navigate } from "react-router-dom";
 
@@ -16,7 +17,10 @@ export function PublicOnlyRoute({ children }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <FullscreenLoader />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  // Jangan hardcode "/dashboard" — user yang udah login tapi role-nya gak
+  // punya akses menu.dashboard bakal mental balik ke sini kalau dipaksa ke
+  // situ. getDefaultPath ngasih halaman pertama yang beneran boleh dia buka.
+  if (user) return <Navigate to={getDefaultPath(user)} replace />;
 
   return children;
 }

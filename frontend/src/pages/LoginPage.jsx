@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError, normalizeFieldErrors } from "@/lib/api";
+import { getDefaultPath } from "@/lib/nav";
 import { collectErrors, validateEmail, validateRequired } from "@/lib/validation";
 import { APP_VERSION } from "@/lib/version";
 import { useState } from "react";
@@ -42,13 +43,13 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
       setDialog({
         open: true,
         variant: "success",
         title: "Login berhasil",
-        description: "Kamu akan diarahkan ke dashboard.",
-        action: "dashboard",
+        description: "Kamu akan diarahkan ke halaman utama.",
+        action: getDefaultPath(loggedInUser),
       });
     } catch (err) {
       if (err instanceof ApiError && err.errors) {
@@ -69,7 +70,7 @@ export default function LoginPage() {
   function closeDialog() {
     const { action } = dialog;
     setDialog(EMPTY_DIALOG);
-    if (action === "dashboard") navigate("/dashboard", { replace: true });
+    if (action) navigate(action, { replace: true });
   }
 
   return (
