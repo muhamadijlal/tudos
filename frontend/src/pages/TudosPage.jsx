@@ -678,7 +678,7 @@ export default function TudosPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>
