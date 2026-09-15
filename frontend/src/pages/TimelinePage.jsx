@@ -490,7 +490,7 @@ export default function TimelinePage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-44 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Pemilik</Label>
               <MultiCombobox
                 options={ownerOptions}
@@ -501,10 +501,10 @@ export default function TimelinePage() {
                 renderOption={renderOwnerOption}
                 renderValue={renderOwnerOption}
                 size="sm"
-                className="w-44"
+                className="w-full"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>

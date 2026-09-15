@@ -624,7 +624,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>

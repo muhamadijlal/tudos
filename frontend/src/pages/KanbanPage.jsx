@@ -554,7 +554,7 @@ export default function KanbanPage() {
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-40 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Project</Label>
               <MultiCombobox
                 options={projectFilterOptions}
@@ -563,11 +563,11 @@ export default function KanbanPage() {
                 placeholder="Semua Project"
                 searchPlaceholder="Cari project..."
                 size="sm"
-                className="w-40"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-40 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Epic</Label>
               <MultiCombobox
                 options={epicFilterOptions}
@@ -578,11 +578,11 @@ export default function KanbanPage() {
                 renderOption={renderEpicOption}
                 renderValue={renderEpicOption}
                 size="sm"
-                className="w-40"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-40 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Kategori</Label>
               <MultiCombobox
                 options={categoryFilterOptions}
@@ -591,11 +591,11 @@ export default function KanbanPage() {
                 placeholder="Semua Kategori"
                 searchPlaceholder="Cari kategori..."
                 size="sm"
-                className="w-40"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-40 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Assignee</Label>
               <MultiCombobox
                 options={assigneeFilterOptions}
@@ -607,11 +607,11 @@ export default function KanbanPage() {
                 renderValue={renderAssigneeOption}
                 disabled={!canViewAllTasks}
                 size="sm"
-                className="w-40"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Prioritas</Label>
               <MultiCombobox
                 options={priorityFilterOptions}
@@ -620,11 +620,11 @@ export default function KanbanPage() {
                 placeholder="Semua Prioritas"
                 searchPlaceholder="Cari prioritas..."
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Status</Label>
               <MultiCombobox
                 options={statusFilterOptions}
@@ -633,11 +633,11 @@ export default function KanbanPage() {
                 placeholder="Semua Status"
                 searchPlaceholder="Cari status..."
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-48 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Due Date</Label>
               <DateRangePicker
                 from={draftDueDateFrom}
@@ -647,11 +647,11 @@ export default function KanbanPage() {
                   setDraftDueDateTo(to);
                 }}
                 placeholder="Semua Tanggal"
-                className="w-48"
+                className="w-full"
               />
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>

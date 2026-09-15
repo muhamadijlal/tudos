@@ -588,7 +588,7 @@ export default function TudosPage() {
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Project</Label>
               <Combobox
                 options={projectFilterOptions}
@@ -596,11 +596,11 @@ export default function TudosPage() {
                 onValueChange={updateProjectFilter}
                 searchPlaceholder="Cari project..."
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Epic</Label>
               <Combobox
                 options={epicFilterOptions}
@@ -610,11 +610,11 @@ export default function TudosPage() {
                 renderOption={renderEpicOption}
                 renderValue={renderEpicOption}
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Kategori</Label>
               <Combobox
                 options={categoryFilterOptions}
@@ -622,11 +622,11 @@ export default function TudosPage() {
                 onValueChange={(v) => updateDraft("categoryId", v)}
                 searchPlaceholder="Cari kategori..."
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-36 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Assignee</Label>
               <Combobox
                 options={assigneeFilterOptions}
@@ -637,11 +637,11 @@ export default function TudosPage() {
                 renderOption={renderAssigneeOption}
                 renderValue={renderAssigneeOption}
                 size="sm"
-                className="w-36"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-32 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Prioritas</Label>
               <Combobox
                 options={priorityFilterOptions}
@@ -649,11 +649,11 @@ export default function TudosPage() {
                 onValueChange={(v) => updateDraft("priority", v)}
                 searchPlaceholder="Cari prioritas..."
                 size="sm"
-                className="w-32"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-32 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Status</Label>
               <Combobox
                 options={statusFilterOptions}
@@ -661,11 +661,11 @@ export default function TudosPage() {
                 onValueChange={(v) => updateDraft("status", v)}
                 searchPlaceholder="Cari status..."
                 size="sm"
-                className="w-32"
+                className="w-full"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-56 flex-1 flex-col gap-1">
               <Label className="text-muted-foreground">Due Date</Label>
               <DateRangePicker
                 from={draftFilters.dueDateFrom}
@@ -674,11 +674,11 @@ export default function TudosPage() {
                   setDraftFilters((prev) => ({ ...prev, dueDateFrom: from, dueDateTo: to }))
                 }
                 placeholder="Semua tanggal"
-                className="w-56"
+                className="w-full"
               />
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <Button type="button" size="sm" onClick={applyFilters}>
                 Filter
               </Button>
