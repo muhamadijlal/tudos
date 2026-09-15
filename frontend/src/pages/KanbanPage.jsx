@@ -1,6 +1,7 @@
 import { AssigneeAvatar } from "@/components/AssigneeAvatar";
 import { AssigneeAvatarGroup } from "@/components/AssigneeAvatarGroup";
 import { CodeBadge } from "@/components/CodeBadge";
+import { Combobox } from "@/components/Combobox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DueDateBadge } from "@/components/DueDateBadge";
@@ -43,6 +44,7 @@ import {
   STATUS_DOT,
   STATUS_OPTIONS,
   statusLabel,
+  STATUS_STYLES,
   todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
@@ -106,7 +108,7 @@ function matchesDueDate(task, dueDateFrom, dueDateTo) {
   return true;
 }
 
-function TaskCard({ task, onDragStart, onClick }) {
+function TaskCard({ task, onDragStart, onClick, onStatusChange }) {
   return (
     <div
       draggable
@@ -114,6 +116,18 @@ function TaskCard({ task, onDragStart, onClick }) {
       onClick={() => onClick(task)}
       className="min-w-0 cursor-grab space-y-3 border border-border bg-card p-4 text-xs hover:bg-muted/50 active:cursor-grabbing"
     >
+      {/* Drag & drop native HTML5 gak jalan di layar sentuh — dropdown ini
+          jadi satu-satunya cara pindahin status task di HP/tablet. */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <Combobox
+          options={STATUS_OPTIONS}
+          value={task.status}
+          onValueChange={(value) => onStatusChange(task, value)}
+          searchPlaceholder="Cari status..."
+          size="sm"
+          className={cn("w-full border-transparent", STATUS_STYLES[task.status])}
+        />
+      </div>
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <CodeBadge>{task.code}</CodeBadge>
@@ -504,30 +518,35 @@ export default function KanbanPage() {
     }
   }
 
+  // Dipakai bareng drag & drop DAN dropdown status per kartu (buat HP/tablet
+  // yang gak bisa drag & drop native). Dikembalikan dari In Review ke Todo/In
+  // Progress wajib disertai catatan — PUT-nya ditahan dulu sampe
+  // ReviewNoteDialog diisi & disubmit. Approve final (In Review -> Done) gak
+  // wajib catatan tapi tetep dikonfirm ringan dulu, biar gak sengaja langsung
+  // nutup task-nya.
+  function requestStatusChange(task, status) {
+    if (task.status === status) return;
+    if (requiresReviewNote(task.status, status)) {
+      setReviewPrompt({ taskId: task.id, fromStatus: task.status, toStatus: status });
+    } else if (requiresApproveConfirm(task.status, status)) {
+      setApproveConfirmTaskId(task.id);
+    } else {
+      applyStatusChange(task.id, status).catch(() => {});
+    }
+  }
+
   function handleDrop(e, status) {
     e.preventDefault();
     setDragOverStatus(null);
 
     const taskId = Number(e.dataTransfer.getData("text/plain"));
     const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.status === status) return;
-
-    // Dikembalikan dari In Review ke Todo/In Progress wajib disertai catatan
-    // — drag & drop-nya tetep kepakai, tapi PUT-nya ditahan dulu sampe
-    // ReviewNoteDialog diisi & disubmit. Approve final (In Review -> Done)
-    // gak wajib catatan tapi tetep dikonfirm ringan dulu, biar gak ke-drag
-    // gak sengaja langsung nutup task-nya.
-    if (requiresReviewNote(task.status, status)) {
-      setReviewPrompt({ taskId, fromStatus: task.status, toStatus: status });
-    } else if (requiresApproveConfirm(task.status, status)) {
-      setApproveConfirmTaskId(taskId);
-    } else {
-      applyStatusChange(taskId, status).catch(() => {});
-    }
+    if (!task) return;
+    requestStatusChange(task, status);
   }
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex flex-col gap-3 xl:h-full">
       <Card className="shrink-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -716,15 +735,15 @@ export default function KanbanPage() {
         </Alert>
       )}
       {isLoading ? (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4">
           {STATUS_OPTIONS.map((column) => (
-            <Card key={column.value} className="h-full min-h-0 min-w-0">
+            <Card key={column.value} className="min-w-0 xl:h-full xl:min-h-0">
               <CardHeader className="shrink-0">
                 <CardTitle>
                   <Skeleton className="h-4 w-20" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
+              <CardContent className="flex flex-col gap-3 xl:min-h-0 xl:flex-1">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-24 w-full" />
                 ))}
@@ -733,7 +752,7 @@ export default function KanbanPage() {
           ))}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-4">
           {STATUS_OPTIONS.map((column) => {
             const columnTasks = filteredTasks.filter(
               (t) => t.status === column.value,
@@ -754,7 +773,7 @@ export default function KanbanPage() {
                 }
                 onDrop={(e) => handleDrop(e, column.value)}
                 className={cn(
-                  "h-full min-h-0 min-w-0",
+                  "min-w-0 xl:h-full xl:min-h-0",
                   dragOverStatus === column.value
                     ? "ring-2 ring-ring"
                     : undefined,
@@ -773,7 +792,7 @@ export default function KanbanPage() {
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                <CardContent className="flex flex-col gap-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
                   {columnTasks.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Kosong</p>
                   ) : (
@@ -784,6 +803,7 @@ export default function KanbanPage() {
                           task={task}
                           onDragStart={handleDragStart}
                           onClick={setDetailTask}
+                          onStatusChange={requestStatusChange}
                         />
                       ))}
                       {remaining > 0 && (

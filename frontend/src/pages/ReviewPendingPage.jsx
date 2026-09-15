@@ -147,7 +147,7 @@ export default function ReviewPendingPage() {
       </Button>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Perlu Direview</CardTitle>
             <CardDescription>
@@ -176,7 +176,7 @@ export default function ReviewPendingPage() {
                   <TableHead className="hidden sm:table-cell">Kode</TableHead>
                   <TableHead>Task</TableHead>
                   <TableHead className="hidden md:table-cell">Project</TableHead>
-                  <TableHead>Assignee</TableHead>
+                  <TableHead className="hidden sm:table-cell">Assignee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden sm:table-cell">Terakhir Diubah</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
@@ -191,11 +191,13 @@ export default function ReviewPendingPage() {
                       <TableCell className="hidden sm:table-cell">
                         <CodeBadge>{task.code}</CodeBadge>
                       </TableCell>
-                      <TableCell className="font-medium">{task.name}</TableCell>
+                      <TableCell className="max-w-[120px] truncate font-medium sm:max-w-xs">
+                        {task.name}
+                      </TableCell>
                       <TableCell className="hidden text-muted-foreground md:table-cell">
                         {task.project?.name ?? "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <AssigneeAvatarGroup assignees={task.assignees} size="xs" />
                       </TableCell>
                       <TableCell>
@@ -205,7 +207,7 @@ export default function ReviewPendingPage() {
                           onValueChange={(value) => requestStatusChange(task, value)}
                           searchPlaceholder="Cari status..."
                           size="sm"
-                          className={cn("w-32 border-transparent", STATUS_STYLES[task.status])}
+                          className={cn("w-24 sm:w-32 border-transparent", STATUS_STYLES[task.status])}
                         />
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground sm:table-cell">

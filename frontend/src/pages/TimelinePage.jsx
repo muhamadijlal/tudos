@@ -524,9 +524,9 @@ export default function TimelinePage() {
       {error && <p className="shrink-0 text-xs text-destructive">{error}</p>}
 
       <Card className="flex min-h-0 flex-1 flex-col">
-        <CardHeader className="shrink-0 flex-row items-center justify-between">
+        <CardHeader className="flex shrink-0 flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>{rangeLabel}</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ExportButtons
               title="Timeline"
               columns={exportColumns}

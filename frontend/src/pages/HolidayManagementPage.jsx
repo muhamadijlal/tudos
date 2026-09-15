@@ -159,7 +159,7 @@ export default function HolidayManagementPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Libur Nasional</CardTitle>
           <CardDescription>
@@ -168,7 +168,7 @@ export default function HolidayManagementPage() {
             sinkron dari API publik (upset.dev/tanggalmerah).
           </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="number"
             value={syncYear}

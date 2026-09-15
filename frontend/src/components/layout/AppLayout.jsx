@@ -56,13 +56,13 @@ export function AppLayout() {
         <AppSidebar />
         <SidebarInset className="overflow-hidden">
           <header className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="h-8" />
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <SidebarTrigger className="shrink-0" />
+              <Separator orientation="vertical" className="h-8 shrink-0" />
               <HeaderBreadcrumb />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <NotificationBell />
               <ThemePresetPicker />
               <ThemeToggle />

@@ -275,12 +275,12 @@ export default function EpicManagementPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Management Epic</CardTitle>
           <CardDescription>Kelola semua epic lintas project — buat, ubah, hapus.</CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
             title="Management Epic"
             columns={exportColumns}
@@ -373,7 +373,9 @@ export default function EpicManagementPage() {
                     <TableCell>
                       <CodeBadge>{epic.code}</CodeBadge>
                     </TableCell>
-                    <TableCell className="font-medium">{epic.name}</TableCell>
+                    <TableCell className="max-w-[140px] truncate font-medium sm:max-w-xs">
+                      {epic.name}
+                    </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {epic.project.name}
                     </TableCell>
