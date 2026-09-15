@@ -2,6 +2,20 @@
 
 Semua perubahan penting pada Tudos dicatat di file ini.
 
+## [2.0.0] - 2026-09-15
+
+### Added
+- Preset warna tema ala shadcn/ui (Zinc/Slate/Stone/Gray/Neutral/Red/Orange/Yellow/Green/Blue/Rose) — bisa dipilih lewat ikon palet di sebelah toggle terang/gelap.
+- Tombol "Semua Tanggal" di date range picker filter periode (Tudos/Kanban) — cara langsung buat lepas batasan periode tanpa harus reset semua filter lain.
+
+### Changed
+- Filter periode (due date) di Tudos & Kanban balik default ke "hari ini" (sebelumnya "semua tanggal") — task yang butuh perhatian di luar hari ini tetap kelihatan lewat banner "perlu perhatian".
+- Semua card Filter (Dashboard/Tudos/Kanban/Timeline) sekarang konsisten: field-nya ngisi lebar penuh baris (flex, bukan lebar tetap) dan tombol Filter/Reset Filter selalu nempel di kanan, baik nyatu di baris field maupun turun ke baris sendiri kalau kepotong wrap.
+- Kartu task Kanban sekarang bungkus judul/deskripsi/nama project yang panjang (bukan overflow/kepotong) di kolom yang sempit.
+
+### Fixed
+- Redirect abis login (dan halaman login/register buat yang udah login) sekarang ke halaman default yang beneran boleh diakses user itu, bukan di-hardcode ke /dashboard — role yang gak punya akses menu Dashboard sebelumnya bisa nyasar ke /no-access padahal punya akses ke menu lain.
+
 ## [2.0.0-beta.7] - 2026-09-14
 
 ### Fixed
