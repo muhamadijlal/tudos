@@ -9,6 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
@@ -16,7 +17,7 @@ import { ADMIN_NAV_ITEMS, NAV_ITEMS } from "@/lib/nav";
 import { APP_VERSION } from "@/lib/version";
 import { Link, useLocation } from "react-router-dom";
 
-function NavGroup({ label, items, pathname }) {
+function NavGroup({ label, items, pathname, onNavigate }) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -27,6 +28,7 @@ function NavGroup({ label, items, pathname }) {
               <SidebarMenuButton
                 isActive={pathname === to}
                 tooltip={itemLabel}
+                onClick={onNavigate}
                 render={<Link to={to} />}
               >
                 <Icon />
@@ -43,6 +45,10 @@ function NavGroup({ label, items, pathname }) {
 export function AppSidebar() {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const handleNavigate = () => {
+    if (isMobile) setOpenMobile(false);
+  };
   const visibleNavItems = NAV_ITEMS.filter((item) => hasPermission(user, item.permission));
   const visibleAdminItems = ADMIN_NAV_ITEMS.filter((item) => hasPermission(user, item.permission));
 
@@ -57,10 +63,10 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {visibleNavItems.length > 0 && (
-          <NavGroup label="Menu" items={visibleNavItems} pathname={pathname} />
+          <NavGroup label="Menu" items={visibleNavItems} pathname={pathname} onNavigate={handleNavigate} />
         )}
         {visibleAdminItems.length > 0 && (
-          <NavGroup label="Administrasi" items={visibleAdminItems} pathname={pathname} />
+          <NavGroup label="Administrasi" items={visibleAdminItems} pathname={pathname} onNavigate={handleNavigate} />
         )}
       </SidebarContent>
       <SidebarFooter>
