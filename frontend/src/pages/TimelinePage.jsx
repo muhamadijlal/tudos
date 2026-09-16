@@ -16,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
+import { BRAND_GRADIENT_BG } from "@/lib/brand";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { formatDate, STATUS_DOT, statusLabel } from "@/lib/task";
 import { cn } from "@/lib/utils";
@@ -549,7 +550,7 @@ export default function TimelinePage() {
                   onClick={() => setZoom(key)}
                   className={cn(
                     "px-2.5 py-1.5 text-xs text-muted-foreground",
-                    zoom === key && "bg-primary text-primary-foreground",
+                    zoom === key && cn(BRAND_GRADIENT_BG, "text-white"),
                   )}
                 >
                   {level.label}

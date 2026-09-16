@@ -1,7 +1,6 @@
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { PasswordInput } from "@/components/PasswordInput";
 import { FormRequiredNote, RequiredMark } from "@/components/RequiredMark";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,11 +98,10 @@ export default function RegisterPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4">
-      <div className="fixed right-4 top-4">
-        <ThemeToggle />
-      </div>
+      <div className="flex w-full max-w-xl flex-col items-center gap-4">
+        <img src="/icon.png" alt="Tudos" className="h-16 w-16" />
 
-      <Card className="w-full max-w-xl">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Buat akun Tudos</CardTitle>
           <CardDescription>Isi data di bawah untuk mendaftar</CardDescription>
@@ -257,6 +255,7 @@ export default function RegisterPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
 
       <FeedbackDialog
         open={dialog.open}

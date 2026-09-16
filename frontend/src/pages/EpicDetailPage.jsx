@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useBreadcrumb } from "@/context/BreadcrumbContext";
 import { api, ApiError } from "@/lib/api";
+import { BRAND_GRADIENT_BG } from "@/lib/brand";
 import { epicPeriodLabel } from "@/lib/epic";
 import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import {
@@ -162,7 +163,7 @@ export default function EpicDetailPage() {
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-32 shrink-0 rounded-full bg-muted">
                         <div
-                          className="h-1.5 rounded-full bg-primary"
+                          className={cn("h-1.5 rounded-full", BRAND_GRADIENT_BG)}
                           style={{ width: `${epic.progress.percent}%` }}
                         />
                       </div>

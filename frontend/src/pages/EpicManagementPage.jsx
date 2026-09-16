@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { usePagination } from "@/hooks/use-pagination";
 import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
+import { BRAND_GRADIENT_BG } from "@/lib/brand";
 import { epicPeriodLabel } from "@/lib/epic";
 import { EPIC_COLOR_DOT, EPIC_COLOR_OPTIONS } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
@@ -66,7 +67,10 @@ function EpicProgressBar({ progress }) {
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-20 shrink-0 rounded-full bg-muted">
-        <div className="h-1.5 rounded-full bg-primary" style={{ width: `${progress.percent}%` }} />
+        <div
+          className={cn("h-1.5 rounded-full", BRAND_GRADIENT_BG)}
+          style={{ width: `${progress.percent}%` }}
+        />
       </div>
       <span className="shrink-0 text-muted-foreground">
         {progress.done}/{progress.total}
