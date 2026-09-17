@@ -1,6 +1,7 @@
 import { AssigneeAvatar } from "@/components/AssigneeAvatar";
 import { AssigneeAvatarGroup } from "@/components/AssigneeAvatarGroup";
 import { CodeBadge } from "@/components/CodeBadge";
+import { DatePicker, formatDateStr, parseDateStr } from "@/components/DatePicker";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { MultiCombobox } from "@/components/MultiCombobox";
@@ -565,6 +566,12 @@ export default function TimelinePage() {
             >
               Hari Ini
             </Button>
+            <DatePicker
+              value={formatDateStr(anchor)}
+              onChange={(value) => setAnchor(mondayOf(parseDateStr(value)))}
+              placeholder="Pilih Tanggal"
+              className="w-auto"
+            />
             <Button
               type="button"
               variant="outline"

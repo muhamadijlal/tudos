@@ -42,7 +42,12 @@ function Calendar({
         ),
         month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          // nav absolute inset-x-0 nutupin seluruh lebar row caption (termasuk
+          // area kosong di tengah antar 2 tombol panah) — pointer-events-none
+          // di wrapper + pointer-events-auto di tombolnya sendiri biar klik di
+          // area kosong itu tetap tembus ke elemen di bawahnya (mis. caption
+          // custom yang clickable, lihat DateNavCalendar).
+          "pointer-events-none absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1 [&>button]:pointer-events-auto",
           defaultClassNames.nav
         ),
         button_previous: cn(

@@ -271,7 +271,10 @@ export default function DashboardPage() {
   // Rentang periode buat chart bulanan: pakai filter bulan+tahun kalau
   // diisi, default satu tahun penuh berjalan (Januari - Desember) kalau
   // kosong. Filter-nya sengaja cuma granularitas bulan (input type="month"),
-  // gak perlu setajam tanggal spesifik.
+  // gak perlu setajam tanggal spesifik. Dikelompokkan pakai task.reportDate
+  // ("Tanggal Laporan", bebas diedit user) — bukan createdAt (waktu row
+  // dibikin, gak berubah) — biar task yang di-input mundur (retroaktif)
+  // tetap nongol di bulan aslinya, bukan numpuk di bulan task itu di-input.
   const { rangeStart, rangeEnd, periodTasks } = useMemo(() => {
     const now = new Date();
     const end = parseMonthEnd(appliedFilters.dateTo) ?? new Date(now.getFullYear(), 11, 31);
@@ -293,8 +296,8 @@ export default function DashboardPage() {
     );
 
     const filtered = scopedTasks.filter((task) => {
-      const created = new Date(task.createdAt);
-      return created >= startOfDay && created <= endOfDay;
+      const reported = new Date(task.reportDate);
+      return reported >= startOfDay && reported <= endOfDay;
     });
 
     return {
@@ -322,7 +325,7 @@ export default function DashboardPage() {
     }
 
     for (const task of periodTasks) {
-      const key = monthKey(task.createdAt);
+      const key = monthKey(task.reportDate);
       if (!buckets.has(key)) {
         buckets.set(key, {
           month: key,
@@ -379,7 +382,9 @@ export default function DashboardPage() {
   }, [periodTasks]);
 
   // Heatmap selalu rolling 1 tahun terakhir, gak kepengaruh filter tanggal
-  // (yang itu punya "periode" sendiri buat chart bulanan).
+  // (yang itu punya "periode" sendiri buat chart bulanan). Sama kayak chart
+  // bulanan di atas, dikelompokkan pakai reportDate biar task yang di-input
+  // retroaktif nongol di tanggal aslinya.
   const heatmapValue = useMemo(() => {
     const counts = new Map();
     // Batas generus (2 tahun) — cukup buat nutupin rentang yang ditampilin
@@ -390,9 +395,9 @@ export default function DashboardPage() {
     cutoff.setFullYear(cutoff.getFullYear() - 2);
 
     for (const task of scopedTasks) {
-      const created = new Date(task.createdAt);
-      if (created < cutoff) continue;
-      const key = dayKeySlash(created);
+      const reported = new Date(task.reportDate);
+      if (reported < cutoff) continue;
+      const key = dayKeySlash(reported);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
 
@@ -678,7 +683,7 @@ export default function DashboardPage() {
           <div>
             <CardTitle>Summary per Bulan</CardTitle>
             <CardDescription>
-              Jumlah task dibuat per bulan, dipecah per status.
+              Jumlah task per bulan (berdasarkan tanggal laporan), dipecah per status.
             </CardDescription>
           </div>
           <ExportButtons
@@ -777,7 +782,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Aktivitas 1 Tahun Terakhir</CardTitle>
           <CardDescription>
-            Jumlah task dibuat per hari, seperti kontribusi GitHub.
+            Jumlah task per hari berdasarkan tanggal laporan, seperti kontribusi GitHub.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 overflow-x-auto ">

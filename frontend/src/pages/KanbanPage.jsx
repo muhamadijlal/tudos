@@ -1,7 +1,6 @@
 import { AssigneeAvatar } from "@/components/AssigneeAvatar";
 import { AssigneeAvatarGroup } from "@/components/AssigneeAvatarGroup";
 import { CodeBadge } from "@/components/CodeBadge";
-import { Combobox } from "@/components/Combobox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { DueDateBadge } from "@/components/DueDateBadge";
@@ -44,7 +43,6 @@ import {
   STATUS_DOT,
   STATUS_OPTIONS,
   statusLabel,
-  STATUS_STYLES,
   todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
@@ -108,7 +106,7 @@ function matchesDueDate(task, dueDateFrom, dueDateTo) {
   return true;
 }
 
-function TaskCard({ task, onDragStart, onClick, onStatusChange }) {
+function TaskCard({ task, onDragStart, onClick }) {
   return (
     <div
       draggable
@@ -116,18 +114,6 @@ function TaskCard({ task, onDragStart, onClick, onStatusChange }) {
       onClick={() => onClick(task)}
       className="min-w-0 cursor-grab space-y-3 border border-border bg-card p-4 text-xs hover:bg-muted/50 active:cursor-grabbing"
     >
-      {/* Drag & drop native HTML5 gak jalan di layar sentuh — dropdown ini
-          jadi satu-satunya cara pindahin status task di HP/tablet. */}
-      <div onClick={(e) => e.stopPropagation()}>
-        <Combobox
-          options={STATUS_OPTIONS}
-          value={task.status}
-          onValueChange={(value) => onStatusChange(task, value)}
-          searchPlaceholder="Cari status..."
-          size="sm"
-          className={cn("w-full border-transparent", STATUS_STYLES[task.status])}
-        />
-      </div>
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <CodeBadge>{task.code}</CodeBadge>
@@ -803,7 +789,6 @@ export default function KanbanPage() {
                           task={task}
                           onDragStart={handleDragStart}
                           onClick={setDetailTask}
-                          onStatusChange={requestStatusChange}
                         />
                       ))}
                       {remaining > 0 && (

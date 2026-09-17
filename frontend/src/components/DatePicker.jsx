@@ -1,5 +1,5 @@
+import { DateNavCalendar } from "@/components/DateNavCalendar";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CalendarBlank } from "@phosphor-icons/react";
@@ -45,8 +45,9 @@ export function DatePicker({ value, onChange, placeholder = "Pilih tanggal", cla
           : placeholder}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
-        <Calendar
+        <DateNavCalendar
           mode="single"
+          month={selected ?? new Date()}
           selected={selected}
           onSelect={(date) => date && onChange(formatDateStr(date))}
         />

@@ -1,6 +1,6 @@
+import { DateNavCalendar } from "@/components/DateNavCalendar";
 import { formatDateStr, parseDateStr } from "@/components/DatePicker";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CalendarBlank } from "@phosphor-icons/react";
@@ -44,10 +44,11 @@ export function DateRangePicker({
         {label}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-0">
-        <Calendar
+        <DateNavCalendar
           mode="range"
           required
           numberOfMonths={2}
+          month={range.from ?? new Date()}
           selected={range}
           onSelect={(next) =>
             onChange({
