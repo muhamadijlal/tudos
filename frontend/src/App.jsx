@@ -1,4 +1,5 @@
 import { ProtectedRoute, PublicOnlyRoute, RequirePermission } from "@/components/ProtectedRoute";
+import FullscreenLoader from "@/components/FullscreenLoader";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/context/AuthContext";
 import { ALL_NAV_ITEMS, getDefaultPath } from "@/lib/nav";
@@ -52,7 +53,13 @@ function ProtectedLayout() {
 }
 
 function RootRedirect() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  // Tunggu /auth/me selesai dulu — kalau langsung dievaluasi pas isLoading
+  // masih true, `user` masih null (state awal), jadi getDefaultPath(null)
+  // selalu jatuh ke "/no-access" walau usernya beneran punya akses, begitu
+  // halaman "/" diakses langsung (refresh/buka tab baru), bukan navigasi
+  // dari dalam app yang `user`-nya udah kemuat.
+  if (isLoading) return <FullscreenLoader />;
   return <Navigate to={getDefaultPath(user)} replace />;
 }
 
