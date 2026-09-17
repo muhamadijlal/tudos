@@ -3,7 +3,6 @@ import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
-import { ThemePresetPicker } from "@/components/ThemePresetPicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -64,7 +63,6 @@ export function AppLayout() {
 
             <div className="flex shrink-0 items-center gap-2">
               <NotificationBell />
-              <ThemePresetPicker />
               <ThemeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger

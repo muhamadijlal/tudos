@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
+import { isEpicClosed } from "@/lib/epic";
 import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { hasPermission } from "@/lib/permissions";
@@ -41,7 +42,6 @@ import {
   STATUS_OPTIONS,
   STATUS_STYLES,
   statusLabel,
-  todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
 import { FunnelSimple, Info, Plus } from "@phosphor-icons/react";
@@ -76,14 +76,12 @@ function matchesTaskOwnership(task, ownershipFilter, currentUser) {
   return true;
 }
 
-// Default filter: due date terkunci ke hari ini, dan assignee dikunci ke diri
-// sendiri buat yang gak bisa lihat semua task. Dipakai buat state awal
-// (draft & applied) dan buat "Reset Filter". Task todo/belum-assign yang
-// due date-nya di luar hari ini tetep kelihatan lewat banner "perlu
-// perhatian" di bawah filter (lihat hiddenByPeriodTasks) — jadi gak
-// kesembunyiin diam-diam biarpun defaultnya cuma hari ini.
+// Default filter: assignee dikunci ke diri sendiri buat yang gak bisa lihat
+// semua task. Dipakai buat state awal (draft & applied) dan buat "Reset
+// Filter". Due Date sengaja gak dikunci ke hari ini (due date opsional di
+// Task) — kalau dikunci, task todo/belum-assign yang due date-nya bukan hari
+// ini (atau kosong) ikut ketutup.
 function defaultFilters(canViewAllTasks, currentUser) {
-  const today = todayDateStr();
   return {
     projectId: ALL,
     epicId: ALL,
@@ -91,8 +89,8 @@ function defaultFilters(canViewAllTasks, currentUser) {
     userId: canViewAllTasks ? ALL : String(currentUser?.id ?? ""),
     priority: ALL,
     status: ALL,
-    dueDateFrom: today,
-    dueDateTo: today,
+    dueDateFrom: "",
+    dueDateTo: "",
   };
 }
 
@@ -184,8 +182,7 @@ export default function TudosPage() {
     const defaults = defaultFilters(canViewAllTasks, currentUser);
     // Datang dari link "Detail" di dialog project (?projectId=X) atau
     // "Lihat Semua di Tudos" di EpicDetailPage (?epicId=X) — kunci filter ke
-    // project/epic itu & lepas batasan due date biar semua task-nya
-    // kelihatan, bukan cuma yang due date-nya hari ini.
+    // project/epic itu.
     const projectIdParam = searchParams.get("projectId");
     const epicIdParam = searchParams.get("epicId");
     const initial =
@@ -194,8 +191,6 @@ export default function TudosPage() {
             ...defaults,
             ...(projectIdParam ? { projectId: projectIdParam } : {}),
             ...(epicIdParam ? { epicId: epicIdParam } : {}),
-            dueDateFrom: "",
-            dueDateTo: "",
           }
         : defaults;
     setDraftFilters(initial);
@@ -435,13 +430,16 @@ export default function TudosPage() {
     ...projects.map((p) => ({ value: String(p.id), label: p.name })),
   ];
   // Filter Epic cascading dari filter Project (draft) — kalau project-nya
-  // "Semua", tampilin semua epic lintas project.
+  // "Semua", tampilin semua epic lintas project. Epic yang udah closed
+  // (semua task-nya done) disembunyiin, kecuali lagi jadi filter aktif.
   const epicFilterOptions = [
     { value: ALL, label: "Semua Epic" },
     ...(draftFilters.projectId === ALL
       ? epics
       : epics.filter((e) => String(e.projectId) === draftFilters.projectId)
-    ).map((e) => ({ value: String(e.id), label: e.name, color: e.color })),
+    )
+      .filter((e) => !isEpicClosed(e) || String(e.id) === draftFilters.epicId)
+      .map((e) => ({ value: String(e.id), label: e.name, color: e.color })),
   ];
   const categoryFilterOptions = [
     { value: ALL, label: "Semua Kategori" },

@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
+import { isEpicClosed } from "@/lib/epic";
 import { EPIC_COLOR_DOT } from "@/lib/epicColor";
 import { filenamePeriodSuffix } from "@/lib/export";
 import { hasPermission } from "@/lib/permissions";
@@ -43,7 +44,6 @@ import {
   STATUS_DOT,
   STATUS_OPTIONS,
   statusLabel,
-  todayDateStr,
 } from "@/lib/task";
 import { cn } from "@/lib/utils";
 import { FunnelSimple, Info, Plus } from "@phosphor-icons/react";
@@ -63,14 +63,14 @@ function parseIdsParam(searchParams, key) {
   return raw ? raw.split(",").filter(Boolean) : [];
 }
 
-// Default filter periode dikunci ke hari ini — kalau param-nya belum ada di
-// URL sama sekali (kunjungan baru), pakai hari ini. User yang sengaja milih
-// "Semua Tanggal" nyimpen pilihannya sebagai literal "all" di URL (bukan
-// cuma dihapus), biar reload/share link gak diam-diam balik ke hari ini.
+// Default filter periode gak dikunci ke tanggal apapun (due date opsional di
+// Task, kalau dikunci ke hari ini task todo/belum-assign yang due date-nya
+// bukan hari ini ikut ketutup). User yang sengaja milih "Semua Tanggal"
+// nyimpen pilihannya sebagai literal "all" di URL (bukan cuma dihapus), biar
+// reload/share link gak diam-diam balik ke hari ini.
 function parseDateParam(searchParams, key) {
   const raw = searchParams.get(key);
-  if (raw === null) return todayDateStr();
-  if (raw === "all") return "";
+  if (raw === null || raw === "all") return "";
   return raw;
 }
 
@@ -342,23 +342,22 @@ export default function KanbanPage() {
     const resetAssignee = canViewAllTasks
       ? []
       : [String(currentUser?.id ?? "")];
-    const today = todayDateStr();
     setDraftProjectFilter([]);
     setDraftEpicFilter([]);
     setDraftAssigneeFilter(resetAssignee);
     setDraftCategoryFilter([]);
     setDraftPriorityFilter([]);
     setDraftStatusFilter([]);
-    setDraftDueDateFrom(today);
-    setDraftDueDateTo(today);
+    setDraftDueDateFrom("");
+    setDraftDueDateTo("");
     setProjectFilter([]);
     setEpicFilter([]);
     setAssigneeFilter(resetAssignee);
     setCategoryFilter([]);
     setPriorityFilter([]);
     setStatusFilter([]);
-    setDueDateFrom(today);
-    setDueDateTo(today);
+    setDueDateFrom("");
+    setDueDateTo("");
     setVisibleCounts({});
   }
 
@@ -383,12 +382,15 @@ export default function KanbanPage() {
     label: p.name,
   }));
   // Filter Epic cascading dari filter Project (draft) — kalau belum ada
-  // project yang dipilih, tampilin semua epic lintas project.
+  // project yang dipilih, tampilin semua epic lintas project. Epic yang udah
+  // closed (semua task-nya done) disembunyiin, kecuali lagi jadi filter aktif.
   const epicFilterOptions = (
     draftProjectFilter.length
       ? epics.filter((e) => draftProjectFilter.includes(String(e.projectId)))
       : epics
-  ).map((e) => ({ value: String(e.id), label: e.name, color: e.color }));
+  )
+    .filter((e) => !isEpicClosed(e) || draftEpicFilter.includes(String(e.id)))
+    .map((e) => ({ value: String(e.id), label: e.name, color: e.color }));
   const assigneeFilterOptions = canViewAllTasks
     ? users.map((u) => ({ value: String(u.id), label: u.name }))
     : [

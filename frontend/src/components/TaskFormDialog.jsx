@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError, normalizeFieldErrors } from "@/lib/api";
+import { isEpicClosed } from "@/lib/epic";
 import {
   describeStatusTransition,
   PRIORITY_OPTIONS,
@@ -120,6 +121,7 @@ export function TaskFormDialog({
   const selectedProject = projects.find((p) => String(p.id) === form.projectId);
   const epicOptions = (epics ?? [])
     .filter((e) => String(e.projectId) === form.projectId)
+    .filter((e) => !isEpicClosed(e) || String(e.id) === form.epicId)
     .map((e) => ({ value: String(e.id), label: e.name }));
   const selectedEpic = (epics ?? []).find((e) => String(e.id) === form.epicId);
   const userOptions = users.map((u) => ({ value: String(u.id), label: u.name }));

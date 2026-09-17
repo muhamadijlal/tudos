@@ -32,12 +32,14 @@ import { useNavigate } from "react-router-dom";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ROW_HEIGHT = 40;
-// Header 2 baris ala Jira: baris atas nama bulan (span beberapa kolom hari),
-// baris bawah angka tanggal per hari (disembunyikan kalau kolomnya kesempitan
-// buat nampilin — lihat `showDayNumber` di ZOOM_LEVELS).
+// Header 3 baris ala Jira: nama bulan (span beberapa kolom hari) -> nomor
+// minggu-dalam-bulan (W1..W5, lihat weekSegments) -> angka tanggal per hari
+// (disembunyikan kalau kolomnya kesempitan buat nampilin — lihat
+// `showDayNumber` di ZOOM_LEVELS).
 const MONTH_ROW_HEIGHT = 22;
+const WEEK_ROW_HEIGHT = 18;
 const DAY_ROW_HEIGHT = 34;
-const HEADER_HEIGHT = MONTH_ROW_HEIGHT + DAY_ROW_HEIGHT;
+const HEADER_HEIGHT = MONTH_ROW_HEIGHT + WEEK_ROW_HEIGHT + DAY_ROW_HEIGHT;
 const LABEL_WIDTH = 260;
 
 // Level zoom ala Jira Timeline (Weeks/Months/Quarters) — ngubah lebar kolom
@@ -86,6 +88,19 @@ function dateRange(item) {
   return start <= end
     ? { start: startOfDay(start), end: startOfDay(end) }
     : { start: startOfDay(end), end: startOfDay(start) };
+}
+
+// Gabungin beberapa rentang (yang null diabaikan) jadi 1 rentang terluar
+// (start paling awal - end paling akhir) — dipakai buat bar agregat Project
+// & Epic pas collapsed, biar tetap kelihatan rentangnya walau dia sendiri
+// gak punya tanggal (atau tanggalnya lebih pendek dari task-task-nya).
+function combineRanges(ranges) {
+  const valid = ranges.filter(Boolean);
+  if (!valid.length) return null;
+  return {
+    start: valid.reduce((min, r) => (r.start < min ? r.start : min), valid[0].start),
+    end: valid.reduce((max, r) => (r.end > max ? r.end : max), valid[0].end),
+  };
 }
 
 // Posisi & lebar bar (dalam kolom hari) buat item yang rentangnya udah
@@ -223,12 +238,14 @@ export default function TimelinePage() {
     try {
       const res = await api.get("/projects");
       setProjects(res.data);
-      // Default semua Project & Epic dalam keadaan expanded (bukan collapsed
-      // kayak sebelumnya) — task ngikut tampil otomatis begitu epic-nya
-      // expanded, gak punya toggle sendiri. User masih bisa collapse manual
-      // lewat caret kalau mau.
-      setExpandedProjects(new Set(res.data.map((p) => p.id)));
-      setExpandedEpics(new Set(res.data.flatMap((p) => (p.epics ?? []).map((e) => e.id))));
+      // Default semua Project & Epic dalam keadaan collapsed — kalau task-nya
+      // banyak, full-expand bikin baris kebanyakan & gak kondusif diliat.
+      // Baris Project/Epic yang collapsed tetap kelihatan bar-nya lewat
+      // rentang agregat (lihat combineRanges/epicFullRanges di `rows`), jadi
+      // gak kehilangan info walau ketutup. User expand manual lewat caret
+      // kalau mau liat detail epic/task-nya.
+      setExpandedProjects(new Set());
+      setExpandedEpics(new Set());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Gagal memuat project");
     } finally {
@@ -257,11 +274,25 @@ export default function TimelinePage() {
     }));
   }, [projects]);
 
+  // Overlap check yang sama dipakai berkali-kali di bawah (project/epic/task)
+  // — null kalau rentangnya gak overlap sama periode yang lagi ditampilin,
+  // biar layoutBar() gak dipanggil dengan rentang yang gak beneran keliatan
+  // (`duration` bisa negatif & bar-nya nyangkut di kiri).
+  function visibleRangeOf(range) {
+    return range && range.start <= rangeEnd && range.end >= rangeStart
+      ? range
+      : null;
+  }
+
   // Baris di-flatten 3 level: Project -> Epic -> Task, tiap level langsung
   // diikuti sub-baris-nya kalau lagi di-expand — ala Jira Timeline. Project
   // sendiri gak lagi punya tanggal (murni container) — jadi baris Project
   // SELALU tampil (gak ikut difilter/diurutin berdasarkan periode kayak
-  // dulu), sama pola kayak Epic yang gak punya due date.
+  // dulu), sama pola kayak Epic yang gak punya due date. Bar-nya sendiri
+  // (Project, atau Epic pas collapsed) pakai rentang AGREGAT dari
+  // epic/task-task di bawahnya (`combineRanges`) — biar tetap kelihatan
+  // progress-nya walau Project gak punya tanggal sendiri, atau Epic-nya
+  // gak diisi tanggal tapi task-task-nya ada.
   const rows = projects
     .filter(
       (p) =>
@@ -269,52 +300,60 @@ export default function TimelinePage() {
     )
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((project) => {
-      const projectRow = {
-        type: "project",
-        key: `p${project.id}`,
-        project,
-        range: null,
-        overdue: false,
-        hasTasks: (project.epics ?? []).length > 0,
-        offset: 0,
-        duration: 0,
-        clippedLeft: false,
-        clippedRight: false,
-      };
-
-      if (!expandedProjects.has(project.id)) return [projectRow];
-
       // Task project ini dikelompokkan per epic (lewat task.epicId, dari
       // project.resource.js#projectTaskSummary) — dipakai buat nentuin isi
-      // expand tiap epic DI PERIODE INI.
+      // expand tiap epic DI PERIODE INI, dan buat hitung rentang agregat.
       const tasksByEpic = new Map();
       for (const task of project.tasks) {
         if (!tasksByEpic.has(task.epicId)) tasksByEpic.set(task.epicId, []);
         tasksByEpic.get(task.epicId).push(task);
       }
 
+      // Rentang penuh per epic (tanggal epic sendiri + semua task-nya) —
+      // dipakai buat bar Epic pas collapsed, dan digabung lagi jadi rentang
+      // agregat Project.
+      const epicFullRanges = new Map();
+      for (const epic of project.epics ?? []) {
+        const epicTasks = tasksByEpic.get(epic.id) ?? [];
+        epicFullRanges.set(
+          epic.id,
+          combineRanges([dateRange(epic), ...epicTasks.map((t) => dateRange(t))]),
+        );
+      }
+      const projectFullRange = combineRanges([...epicFullRanges.values()]);
+      const projectVisibleRange = visibleRangeOf(projectFullRange);
+
+      const projectRow = {
+        type: "project",
+        key: `p${project.id}`,
+        project,
+        range: projectVisibleRange,
+        overdue: projectFullRange ? projectFullRange.end < today : false,
+        hasTasks: (project.epics ?? []).length > 0,
+        ...(projectVisibleRange
+          ? layoutBar(projectVisibleRange, rangeStart, rangeEnd)
+          : { offset: 0, duration: 0, clippedLeft: false, clippedRight: false }),
+      };
+
+      if (!expandedProjects.has(project.id)) return [projectRow];
+
       const epicRows = (project.epics ?? []).flatMap((epic) => {
         const epicRange = dateRange(epic);
-        // Bar cuma boleh digambar kalau rentang epic-nya beneran overlap
-        // sama periode yang lagi ditampilin — kalau enggak, layoutBar() bakal
-        // ngasilin `duration` negatif (clippedEnd < clippedStart) yang bikin
-        // bar-nya nyangkut di offset 0 (kepentok kiri) di periode manapun,
-        // padahal harusnya gak digambar sama sekali.
-        const epicVisibleRange =
-          epicRange &&
-          epicRange.start <= rangeEnd &&
-          epicRange.end >= rangeStart
-            ? epicRange
-            : null;
         const epicTasks = tasksByEpic.get(epic.id) ?? [];
+        const isEpicExpanded = expandedEpics.has(epic.id);
+        // Expanded: bar cuma pakai tanggal epic sendiri (task-nya udah
+        // tampil baris masing-masing, gak perlu diduplikasi ke bar epic).
+        // Collapsed: pakai rentang penuh (epic + task-task-nya) biar tetap
+        // kelihatan walau epic-nya sendiri gak punya tanggal.
+        const epicVisibleRange = visibleRangeOf(
+          isEpicExpanded ? epicRange : epicFullRanges.get(epic.id),
+        );
 
         // Epic SELALU tampil sebagai baris grup kalau project-nya expanded —
         // gak ikut aturan "hilang kalau gak match filter tanggal" kayak
-        // Project (disepakati bareng user). Bar tanggal-nya cuma digambar
-        // kalau rentangnya overlap sama periode ini (`epicVisibleRange`
-        // non-null) — `overdue` tetap dihitung dari rentang ASLI-nya
-        // (`epicRange`), gak peduli lagi kelihatan di periode ini atau
-        // enggak.
+        // Project (disepakati bareng user). `overdue` tetap dihitung dari
+        // rentang ASLI epic-nya sendiri (`epicRange`), gak ikut rentang
+        // agregat, gak peduli lagi kelihatan di periode ini atau enggak.
         const epicRow = {
           type: "epic",
           key: `e${epic.id}`,
@@ -333,7 +372,7 @@ export default function TimelinePage() {
               }),
         };
 
-        if (!expandedEpics.has(epic.id)) return [epicRow];
+        if (!isEpicExpanded) return [epicRow];
 
         // Task JUGA selalu tampil kalau epic-nya expanded (sama kayak Epic
         // di atas, disepakati bareng user) — sebelumnya task yang tanggalnya
@@ -350,8 +389,7 @@ export default function TimelinePage() {
             return a.range.start - b.range.start;
           })
           .map(({ task, range: r }) => {
-            const taskVisibleRange =
-              r && r.start <= rangeEnd && r.end >= rangeStart ? r : null;
+            const taskVisibleRange = visibleRangeOf(r);
             return {
               type: "task",
               key: `t${task.id}`,
@@ -466,6 +504,32 @@ export default function TimelinePage() {
         startIndex: i,
         count: 1,
         label: d.toLocaleDateString("id-ID", { month: "short", year: "numeric" }),
+      });
+    }
+  });
+
+  // Baris minggu-dalam-bulan (W1..W5) di bawah baris bulan — nomornya reset
+  // tiap ganti bulan (tanggal 1-7 = W1, 8-14 = W2, dst, W5 cuma muncul kalau
+  // bulannya beneran punya tanggal 29-31).
+  const weekSegments = [];
+  days.forEach((d, i) => {
+    const week = Math.ceil(d.getDate() / 7);
+    const last = weekSegments[weekSegments.length - 1];
+    if (
+      last &&
+      last.year === d.getFullYear() &&
+      last.month === d.getMonth() &&
+      last.week === week
+    ) {
+      last.count += 1;
+    } else {
+      weekSegments.push({
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        week,
+        startIndex: i,
+        count: 1,
+        label: `W${week}`,
       });
     }
   });
@@ -624,6 +688,23 @@ export default function TimelinePage() {
                           <div
                             key={`${seg.year}-${seg.month}`}
                             className="absolute inset-y-0 flex items-center truncate border-r border-border/60 px-1.5 text-xs text-muted-foreground"
+                            style={{
+                              left: seg.startIndex * DAY_WIDTH,
+                              width: seg.count * DAY_WIDTH,
+                            }}
+                          >
+                            {seg.label}
+                          </div>
+                        ))}
+                      </div>
+                      <div
+                        className="relative border-b border-border"
+                        style={{ height: WEEK_ROW_HEIGHT }}
+                      >
+                        {weekSegments.map((seg) => (
+                          <div
+                            key={`${seg.year}-${seg.month}-${seg.week}`}
+                            className="absolute inset-y-0 flex items-center justify-center truncate border-r border-border/60 px-1 text-[11px] text-muted-foreground"
                             style={{
                               left: seg.startIndex * DAY_WIDTH,
                               width: seg.count * DAY_WIDTH,
